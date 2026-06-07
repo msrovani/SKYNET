@@ -117,9 +117,9 @@
 
 ## Sprint 2: Mesh Local — L1 (Semanas 5-8)
 
-### 2.1 p2p-mesh-network (completo)
-- [ ] Pipeline Parallelism: Particionamento de layers entre peers
-- [ ] Segment Means compression para comunicação entre nós
+### 2.1 p2p-mesh-network ✅
+- [x] Pipeline Parallelism: Particionamento de layers entre peers (9 testes)
+- [x] Segment Means compression para comunicação entre nós (6 testes)
 - [ ] Distributed Speculative Decoding (mobile draft, PC verify)
 
 ### 2.2 core-wasm-engine (continuação)
@@ -222,10 +222,20 @@
 - **Fixes Windows path com acentos:** `fork()` > `spawn(shell:true)`; Node.js gerencia paths internamente
 - **@moq/web-transport bug:** `Request.ok()` consome request se `request.url` lido depois — ordem correcta: url antes de ok()
 
+### Sprint 2 (Junho 2026)
+- **Rust warnings (19→0):** `#![allow(dead_code)]` no crate root, 2 fix manuais (parêntesis, unused variable)
+- **Push GitHub:** 3 commits — inicial, build loop fix, Sprint 2 (github.com/msrovani/SKYNET)
+- **Loop recursivo desktop-node-agent:** `build.cjs` agora é stub (evita `tauri build` loop)
+- **Pipeline Parallelism:** `PipelineManager` com partition proporcional, reconfiguração em falha, 9 testes
+- **Segment Means:** Compressão lossy de ativações (segment means), ratio configurável, 6 testes
+- **Total testes: 52** (13 core-wasm-engine + 39 p2p-mesh-network)
+
 ### Resultados Acumulados
 - **8/8 packages build OK** via `pnpm build` (Turborepo v2.9.16)
-- **37 testes** passando (13 core-wasm-engine sharding + 24 p2p-mesh-network integração)
+- **52 testes** passando (13 core-wasm-engine + 39 p2p-mesh-network)
 - **14/14 tasks** successful em `pnpm test`
 - **WASM**: 502KB → 153KB (wasm-bindgen optimization), JS glue 30KB, types 6KB
 - **WebTransport**: Echo funcional — QUIC connect ~170ms, roundtrip ~15ms, bidirectional streams
+- **Pipeline Parallelism**: Layer partition por capacidade, reconfiguração em falha
+- **Segment Means**: Compressão lossy de ativações (ratio = segmentSize)
 - **ExecuTorch**: API completa com 5 backends, model loader, KNOWN_MODELS

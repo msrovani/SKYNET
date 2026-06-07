@@ -44,16 +44,21 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 14. Circadian-Aware Scheduling > distribuição uniforme (cargas seguem a noite)
 15. Opportunistic CRDT Transport > só IP (LoRa + acústica ultrassónica)
 
-## Estado Atual (Sprint 1.5 — Integração)
+## Estado Atual (Sprint 2 — Mesh Local L1)
 - **Build 8/8 packages OK** via `pnpm build` (Turborepo v2.9.16)
-- **pnpm test**: 14/14 tasks, **37 testes** passando (13 core-wasm-engine + 24 p2p-mesh-network)
+- **pnpm test**: 14/14 tasks, **52 testes** passando (13 core-wasm-engine + 39 p2p-mesh-network)
 - **WASM**: 502KB → 153KB via wasm-bindgen 0.2.122 (69% reduction). JS glue: 30KB. Types: 6KB.
 - **wasm-bindgen-cli 0.2.122** baixado precompilado do GitHub (avoid MSVC linker). Local: `%TEMP%\wasm-bindgen\wasm-bindgen-0.2.122-x86_64-pc-windows-msvc\wasm-bindgen.exe`
 - **build.cjs**: cargo build → wasm-bindgen (temp ASCII `%TEMP%\skynet-wasm-bindgen-out`) → copy to dist/ → tsc
 - **stub/index.ts**: lazy WASM loading via `Function('return import("./core_wasm_engine.js")')()` com fallback TS puro. 18 funções exportadas.
-- **p2p-mesh-network**: 24 testes de integração passando. Cobre: TransportManager (WebTransport + WebRTC fallback), WebRTCFallback, CrdtSync (Automerge v2 CRUD + snapshots), FailoverManager, RoleElection, Capability, InstinctEngine, ExperimentTracker, PeerDiscovery
+- **Rust warnings 0/19** — `#![allow(dead_code)]` no crate root, 2 fix manuais (parêntesis, unused variable)
+- **GitHub**: `github.com/msrovani/SKYNET` — 3 commits (inicial, build loop fix, Sprint 2)
+- **Pipeline Parallelism** (`pipeline.ts`): Particionamento proporcional de layers por capacidade (compute, VRAM, bandwidth). Suporte a falha de peer com reconfiguração de pipeline. 9 testes.
+- **Segment Means** (`segment-means.ts`): Compressão lossy de ativações via segment means. Configurável (segment size, adaptive mode). Ratio = segmentSize. 6 testes.
+- **p2p-mesh-network**: 39 testes. Cobre: TransportManager (WebTransport + WebRTC fallback), WebRTCFallback, CrdtSync (Automerge v2 CRUD + snapshots), FailoverManager, RoleElection, Capability, InstinctEngine, ExperimentTracker, PeerDiscovery, PipelineManager, SegmentMeans
 - **WebTransport Hello World FUNCIONAL!** `@moq/web-transport` v0.1.2 (napi-rs) server + client bidirectional stream echo. Conexão QUIC em ~170ms, roundtrip ~15ms. 3 scripts: `echo-server.ts`, `echo-client.ts`, `run-echo.ts`. Executar: `pnpm example:echo`
 - **Promise.withResolvers polyfill** necessário para Node.js v20 (nativo no v22+). Adicionado em todos os scripts echo.
+- **desktop-node-agent build.cjs**: corrigido (era loop recursivo `tauri build` → `npm run build` → `build.cjs`). Agora é stub.
 - **Tensor sharding**: 13 testes (row/col shard, reconstruct, verify, edge cases). Rust `tensor.rs` + TS stub.
 - **inference-runtime**: `ExecuTorchRuntime` reescrito com API ExecuTorch 1.2 — 5 backends, `getAvailableBackends()`, `recommendBackend()`, `estimateMemory()`, `loadFromBuffer()`, tipos `ExecuTorchTensor`. `ModelLoader` com streaming + progress callback. `KNOWN_MODELS` para Llama 3.2 1B/3B INT4.
 - **Cross-Platform CI**: `.github/workflows/ci.yml` expandido com matrix `[ubuntu, macos, windows]` para `build-ts`, `build-wasm`, `test`. WASM build usa `actions-rust-lang/setup-rust-toolchain` + wasm-bindgen-cli precompilado.
@@ -63,10 +68,9 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 
 ### Bugs Conhecidos
 - **Automerge v2 Proxy rejeita `undefined`** — usar `null` ou omitir propriedade. Fix em `decompressSnapshot` e `updatePeer`.
-- **desktop-node-agent build.cjs** tem loop recursivo (`tauri build` → `npm run build` → `build.cjs`). Não-bloqueante.
 - **Accented Windows paths** quebram GNU linker. WASM build usa `%TEMP%\skynet-wasm-build` (ASCII-only). `fork()` works com paths acentuados (Node.js gerencia internamente); `spawn()` quebra com `shell:true`.
 - **web-sys 0.3.99** lacks WebGPU bindings. WebGPU module stubbed.
-- **@moq/web-transport v0.1.2** `Request.ok()` retorna "request already consumed" se usado após `request.url` em alguns cenários; ordem correcta: `url` antes de `ok()`.
+- **@moq/web-transport v0.1.2** `Request.ok()` retorna "request already consumed" se usado após `request.url`; ordem correcta: `url` antes de `ok()`.
 
 ### Lições Aprendidas
 - `vi.stubGlobal()` + `vi.unstubAllGlobals()` > `vi.doMock()` para mockar globals como WebTransport/RTCPeerConnection
@@ -77,14 +81,24 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - `node-forge` para geração de certificados auto-assinados em pure JS
 - `Promise.withResolvers()` requer Node.js v22+; polyfill manual necessário no v20
 - `fork()` com `execArgv: ['--import', 'tsx/esm']` funciona para subprocessos TS em Windows com paths acentuados (Node.js converte path internamente)
-- `WebTransport.datagrams.readable` e `session.incomingBidirectionalStreams` usam APIs diferentes; alinhar server/client no mesmo canal
+- `WebTransport.datagrams.readable` e `session.incomingBidirectionalStreams` APIs diferentes — alinhar server/client no mesmo canal
+- Partition proporcional: dar 1 layer mínima a cada peer e distribuir remainder via fractional part sorting evita starvation de peers fracos
+- Segment Means: compressão eficiente para ativações entre stages de pipeline (ratio = segmentSize, overhead mínimo)
+- Rust `#![allow(dead_code)]` necessário em crate WASM porque wasm-bindgen exports não são visíveis ao compilador Rust
+- Evitar `tauri build` dentro de `build.cjs` — `beforeBuildCommand` cria loop recursivo se `build` script chama `tauri build`
 
 ## Tarefas Pendentes
 - ~~**WebTransport funcional entre 2 peers reais** — CONCLUÍDO! `pnpm example:echo` funcional~~
+- ~~**Rust warnings (19→0)** — CONCLUÍDO~~
+- ~~**GitHub push + CI** — CONCLUÍDO (github.com/msrovani/SKYNET)~~
+- ~~**Loop recursivo desktop-node-agent** — CONCLUÍDO~~
+- ~~**Pipeline Parallelism** — CONCLUÍDO (9 testes)~~
+- ~~**Segment Means compression** — CONCLUÍDO (6 testes)~~
+- **Distributed Speculative Decoding** — Sprint 2 (mobile draft, PC verify)
+- **Sharded inference pipeline + activation checkpoints** — core-wasm-engine
 - **ExecuTorch Device Test** — precisa de dispositivo físico (Android/iOS com ExecuTorch)
-- **Cross-Platform CI verification** — workflow escrito, precisa de push ao GitHub para validação
+- **Cross-Platform CI verification** — verificar status em github.com/msrovani/SKYNET/actions
 - **WASM em Safari/Firefox** — testes cross-browser pendentes
-- **Inferência local Android** — milestone S1, depende de ExecuTorch device test
 
 ## Comandos
 - `pnpm install` — instalar deps
