@@ -1,0 +1,134 @@
+# SKYNET DePIN
+
+**Inferência de IA distribuída. Computação ociosa global. Uma malha auto-evolutiva.**
+
+[![CI](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml/badge.svg)](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-52%20passing-brightgreen.svg)]()
+
+---
+
+SKYNET agrega **computação ociosa** de smartphones, PCs, Smart TVs e browsers numa malha global de inferência de IA. Qualquer dispositivo com chip pode contribuir — e ganhar.
+
+## O Problema
+
+- **Datacenters estão no limite**: 70% da capacidade global está em dispositivos pessoais ociosos.
+- **IA centralizada é frágil**: gargalos, censura, risco de falha única.
+- **Custos proibitivos**: inferência em GPU cloud custa 10-100x mais que o necessário.
+
+## A Solução
+
+SKYNET é uma **DePIN super app** que orquestra dispositivos heterogéneos numa única máquina de inferência distribuída, com:
+
+| Camada | Dispositivos | Capacidade |
+|--------|-------------|------------|
+| **L0** | Smartphones, IoT | 1-3B params, draft tokens |
+| **L1** | PCs, Consolas | 7-13B params, verificação |
+| **L2** | Workstations, Smart TVs | 13-70B params, sharding |
+| **L3** | Datacenters (parceiros) | 70B+, scheduling global |
+
+## Arquitetura
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    SKYNET Mesh                           │
+│                                                         │
+│  ┌──────────┐   ┌──────────┐   ┌──────────┐            │
+│  │  Phone   │   │    PC    │   │  Smart TV│   ...       │
+│  │ (L0)     │──▶│ (L1)     │──▶│ (L2)     │            │
+│  │ draft    │   │ verify   │   │ shard    │            │
+│  └──────────┘   └──────────┘   └──────────┘            │
+│       │              │              │                   │
+│       └──────────────┴──────────────┘                   │
+│                      │                                  │
+│               ┌──────┴──────┐                           │
+│               │  WebTransport + QUIC │                  │
+│               │  (Multipath, 0-RTT)  │                  │
+│               └──────┬──────┘                           │
+│                      │                                  │
+│        ┌─────────────┼─────────────┐                    │
+│        │  Automerge  │  FedYogi FL │  x402 Payments    │
+│        │  CRDT Sync  │  MPC Secure │  (Solana + Base)  │
+│        └─────────────┴─────────────┘                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Stack
+
+| Componente | Tecnologia |
+|------------|-----------|
+| Core | Rust → WASM (wgpu, WebGPU, INT4) |
+| Transporte | WebTransport + Multipath QUIC, WebRTC fallback |
+| Sincronização | Automerge CRDT v2 |
+| Inferência | ExecuTorch 1.2 (5 backends) |
+| FL | FedYogi + Secure Aggregation MPC |
+| TEE | Intel SGX / AMD SEV → ARM CCA |
+| Blockchain | Solana x402 + State Channels, Base fallback |
+| Térmico | Adaptive Scheduler + Dynamic Shifting |
+| App | React Native (Expo) + Next.js PWA + Tauri |
+
+## Diferenciais
+
+- **Speculative Decoding Distribuído**: mobile gera draft tokens, PC verifica — sem pipeline bubbles.
+- **Semantic Affinity Routing**: cache semântico distribuído — a rede é a memória coletiva.
+- **Circadian-Aware Scheduling**: cargas seguem o terminador terrestre (aproveitam noite/ociosidade).
+- **Self-Healing via Evolução Genética**: parâmetros evoluem (pop 20, crossover 70%, mutação 15%).
+- **Custo ~zero/sessão**: x402 micropagamentos off-chain via Solana State Channels.
+- **80/20 Split**: 80% para o operador do nó, 20% para a rede — competitivo vs Vast.ai.
+
+## Estado Atual
+
+```
+Build:  8/8 packages ✓
+Testes: 52 passando   ✓
+WASM:   153KB         ✓
+WebTransport: QUIC ~170ms, roundtrip ~15ms ✓
+```
+
+[Sprint 2](CHANGELOG.md) em progresso: Pipeline Parallelism + Segment Means compression concluídos.
+
+## Quick Start
+
+```bash
+# Instalar dependências
+pnpm install
+
+# Build todos os pacotes
+pnpm build
+
+# Correr testes
+pnpm test
+
+# WebTransport echo demo (Hello World)
+pnpm --filter @skynet/p2p-mesh-network example:setup
+pnpm --filter @skynet/p2p-mesh-network example:echo
+```
+
+## Repositório
+
+```
+SKYNET/
+├── packages/
+│   ├── core-wasm-engine/        ← Rust→WASM (tensors, thermal, evolution)
+│   ├── p2p-mesh-network/        ← Transporte P2P, CRDT, pipeline parallelism
+│   ├── inference-runtime/       ← ExecuTorch, model loader
+│   ├── tee-attestation-layer/   ← Remote attestation, Proof of Time
+│   ├── blockchain-client/       ← Solana x402, State Channels
+│   ├── fl-training-client/      ← FedYogi, Secure Aggregation
+│   ├── app-ui-orchestrator/     ← React Native + Next.js PWA
+│   └── desktop-node-agent/      ← Tauri (GPU, power, node service)
+├── docs/                        ← ADRs, planning, analysis
+├── CHANGELOG.md
+└── README.md
+```
+
+## Apoiar
+
+- **Código**: contribuições via PR — issues, features, testes.
+- **Computação**: instala o nó SKYNET (em breve nos stores).
+- **Parcerias**: datacenters L3, ISP para TURN/STUN descentralizado.
+
+---
+
+> *"SKYNET não é um projeto fechado. SKYNET é uma grelha de utilidade pública — sem núcleo, sem dono, auto-evolutiva."*
