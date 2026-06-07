@@ -77,16 +77,43 @@ SKYNET é uma **DePIN super app** que orquestra dispositivos heterogéneos numa 
 - **Custo ~zero/sessão**: x402 micropagamentos off-chain via Solana State Channels.
 - **80/20 Split**: 80% para o operador do nó, 20% para a rede — competitivo vs Vast.ai.
 
-## Estado Atual
+## Roadmap & Estado
 
 ```
-Build:  8/8 packages ✓
-Testes: 52 passando   ✓
-WASM:   153KB         ✓
-WebTransport: QUIC ~170ms, roundtrip ~15ms ✓
+Sprint 0 ████████████████████ 100%  Planeamento, ADRs
+Sprint 1 ████████████████████ 100%  Fundação (WASM, WebTransport, ExecuTorch, 8 pacotes)
+Sprint 2 ████████████████░░░░  80%  Mesh Local L1 (Pipeline, Segment Means ✓ | DSD pendente)
+Sprint 3 ░░░░░░░░░░░░░░░░░░░░   0%  Mobile App + Thermal
+Sprint 4 ░░░░░░░░░░░░░░░░░░░░   0%  Segurança + Blockchain
+Sprint 5 ░░░░░░░░░░░░░░░░░░░░   0%  Federated Learning
+Sprint 6 ░░░░░░░░░░░░░░░░░░░░   0%  Integração + Beta
 ```
 
-[Sprint 2](CHANGELOG.md) em progresso: Pipeline Parallelism + Segment Means compression concluídos.
+### O que funciona HOJE (podes executar)
+
+| Componente | Estado |
+|-----------|--------|
+| `pnpm install` + `pnpm build` | ✅ 8/8 packages |
+| `pnpm test` | ✅ 52 testes passam |
+| WebTransport echo demo (`pnpm example:echo`) | ✅ QUIC ~170ms, roundtrip ~15ms |
+| Pipeline Parallelism (código + testes) | ✅ Layer partition por capacidade |
+| Segment Means compression (código + testes) | ✅ Compressão lossy de ativações |
+| WASM core (Rust → WebAssembly) | ✅ 153KB otimizado |
+
+### O que NÃO funciona ainda (próximas sprints)
+
+| Funcionalidade | Previsão |
+|---------------|----------|
+| **Inferência real num PC** | Sprint 3-4 |
+| **App mobile/desktop funcional** | Sprint 3 |
+| **Malha P2P entre múltiplos PCs** | Sprint 2-3 |
+| **Distributed Speculative Decoding** | Sprint 2 (pendente) |
+| **Blockchain (x402, State Channels)** | Sprint 4 |
+| **Federated Learning em dispositivos** | Sprint 5 |
+| **TEE Remote Attestation** | Sprint 4 |
+| **Beta público instalável** | Sprint 6 (target) |
+
+> **⚠️ SKYNET está em desenvolvimento ativo (Pre-Alpha).** Código funcional, testado e buildável — mas não instalável por utilizadores finais. Se és developer ou early adopter, contribui ou acompanha em [github.com/msrovani/SKYNET](https://github.com/msrovani/SKYNET).
 
 ## Quick Start
 
