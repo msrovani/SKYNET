@@ -7,7 +7,7 @@
     "frontendDist": "../src",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "echo 'SKYNET desktop node ready'"
   },
   "app": {
     "windows": [
