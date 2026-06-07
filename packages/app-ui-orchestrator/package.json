@@ -1,0 +1,25 @@
+{
+  "name": "@skynet/app-ui-orchestrator",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'App UI build requires Expo/Next - use build:mobile or build:web'",
+    "dev:mobile": "cd apps/mobile && npx expo start",
+    "dev:web": "cd apps/web && next dev",
+    "build:mobile": "cd apps/mobile && npx expo build",
+    "build:web": "cd apps/web && next build",
+    "lint": "eslint 'apps/**/*.{ts,tsx}' 'shared/**/*.{ts,tsx}'"
+  },
+  "dependencies": {
+    "@skynet/core-wasm-engine": "workspace:*",
+    "@skynet/p2p-mesh-network": "workspace:*",
+    "@skynet/inference-runtime": "workspace:*",
+    "@skynet/blockchain-client": "workspace:*",
+    "@skynet/fl-training-client": "workspace:*",
+    "@skynet/tee-attestation-layer": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "eslint": "^8.57.0"
+  }
+}

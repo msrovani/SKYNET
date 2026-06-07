@@ -1,0 +1,43 @@
+[package]
+name = "core-wasm-engine"
+version = "0.1.0"
+edition = "2021"
+description = "SKYNET DePIN: Rust core compiled to WASM for orchestrating distributed AI inference"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3.99", features = [
+    "console",
+    "Gpu",
+    "GpuAdapter",
+    "GpuDevice",
+    "GpuQueue",
+    "GpuShaderModule",
+    "GpuComputePipeline",
+    "GpuBindGroup",
+    "GpuBuffer",
+    "Navigator",
+    "GpuBufferDescriptor",
+    "GpuComputePassEncoder",
+    "GpuCommandEncoder",
+    "Window",
+    "HtmlCanvasElement",
+] }
+js-sys = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+console_error_panic_hook = "0.1"
+getrandom = { version = "0.2", features = ["js"] }
+fastrand = "2"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[profile.release]
+lto = true
+opt-level = "s"
+strip = true

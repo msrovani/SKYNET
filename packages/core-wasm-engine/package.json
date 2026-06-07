@@ -1,0 +1,27 @@
+{
+  "name": "@skynet/core-wasm-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.cjs",
+    "build:stub": "tsc",
+    "test": "vitest run",
+    "dev": "wasm-pack build --dev --target web --out-dir dist",
+    "clean": "wasm-pack clean"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "devDependencies": {
+    "wasm-pack": "^0.13.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}

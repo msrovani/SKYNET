@@ -1,0 +1,30 @@
+{
+  "name": "@skynet/desktop-node-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "node build.cjs",
+    "preview": "tauri preview",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-shell": "^2.0.0",
+    "@tauri-apps/plugin-process": "^2.0.0",
+    "@skynet/core-wasm-engine": "workspace:*",
+    "@skynet/p2p-mesh-network": "workspace:*",
+    "@skynet/inference-runtime": "workspace:*",
+    "@skynet/blockchain-client": "workspace:*",
+    "@skynet/fl-training-client": "workspace:*",
+    "@skynet/tee-attestation-layer": "workspace:*"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "typescript": "^5.4.0",
+    "eslint": "^8.57.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  }
+}

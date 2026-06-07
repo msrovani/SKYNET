@@ -1,0 +1,97 @@
+name: SKYNET CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install
+      - run: pnpm lint
+
+  build-ts:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install
+      - run: pnpm build
+        env:
+          CI: true
+
+  build-wasm:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: packages/core-wasm-engine
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-unknown-unknown
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Download wasm-bindgen-cli
+        shell: bash
+        run: |
+          mkdir -p "$TEMP/wasm-bindgen"
+          cd "$TEMP/wasm-bindgen"
+          curl -LO "https://github.com/rustwasm/wasm-bindgen/releases/download/0.2.122/wasm-bindgen-0.2.122-x86_64-unknown-linux-musl.tar.gz"
+          tar xzf wasm-bindgen-0.2.122-x86_64-unknown-linux-musl.tar.gz
+          echo "$TEMP/wasm-bindgen/wasm-bindgen-0.2.122-x86_64-unknown-linux-musl" >> $GITHUB_PATH
+      - name: Build WASM (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          node build.cjs
+      - name: Build WASM (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          export TEMP="/tmp/skynet-wasm-build"
+          mkdir -p "$TEMP"
+          node build.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm-dist-${{ matrix.os }}
+          path: packages/core-wasm-engine/dist/
+
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install
+      - run: pnpm test
+        env:
+          CI: true

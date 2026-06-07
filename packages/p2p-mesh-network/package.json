@@ -1,0 +1,28 @@
+{
+  "name": "@skynet/p2p-mesh-network",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "lint": "eslint src/",
+    "example:setup": "tsx scripts/generate-cert.ts",
+    "example:server": "tsx scripts/echo-server.ts",
+    "example:client": "tsx scripts/echo-client.ts",
+    "example:echo": "tsx scripts/run-echo.ts"
+  },
+  "dependencies": {
+    "@automerge/automerge": "^2.2.0",
+    "@skynet/core-wasm-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@moq/web-transport": "^0.1.2",
+    "eslint": "^8.57.0",
+    "node-forge": "^1.4.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}
