@@ -525,6 +525,112 @@ export function createKvCache(config: TransformerConfig): KVCacheEntry[] {
   return cache;
 }
 
+// -- Agent Runtime exports --
+
+export interface AgentConfig {
+  agentId: string;
+  modelId: string;
+  systemPrompt: string;
+  tools: string[];
+  maxTokens: number;
+  temperature: number;
+}
+
+export interface AgentInput {
+  prompt: string;
+  context: string[];
+}
+
+export interface ToolCall {
+  tool: string;
+  input: string;
+  output: string;
+  success: boolean;
+}
+
+export interface AgentOutput {
+  agentId: string;
+  content: string;
+  tokensGenerated: number;
+  latencyMs: number;
+  confidence: number;
+  toolCalls: ToolCall[];
+}
+
+export type AgentState = 'idle' | 'loading' | 'ready' | 'executing' | 'completed' | 'failed';
+
+export class AgentRuntime {
+  private config: AgentConfig;
+  private _state: AgentState = 'idle';
+
+  constructor(config: AgentConfig) {
+    this.config = config;
+  }
+
+  load(): void {
+    this._state = 'loading';
+    this._state = 'ready';
+  }
+
+  execute(input: AgentInput): AgentOutput {
+    if (this._state !== 'ready') throw new Error('Agent not ready');
+    this._state = 'executing';
+    const start = Date.now();
+    const content = `[${this.config.agentId}] ${input.prompt} | Model: ${this.config.modelId} | Tools: ${this.config.tools.join(', ')}`;
+    const output: AgentOutput = {
+      agentId: this.config.agentId,
+      content,
+      tokensGenerated: 10,
+      latencyMs: Date.now() - start,
+      confidence: 0.85,
+      toolCalls: [],
+    };
+    this._state = 'completed';
+    return output;
+  }
+
+  reset(): void {
+    this._state = 'idle';
+  }
+
+  get state(): AgentState { return this._state; }
+  get agentConfig(): AgentConfig { return this.config; }
+}
+
+// -- Agent templates --
+
+export const AGENT_TEMPLATES: Record<string, Partial<AgentConfig>> = {
+  'webdesign': {
+    modelId: 'qwen-2.5-7b-int4',
+    systemPrompt: 'You are a webdesign expert. Create beautiful responsive websites using HTML, CSS, and JavaScript.',
+    tools: ['html-renderer', 'css-generator', 'cdn-upload'],
+    maxTokens: 2048,
+    temperature: 0.7,
+  },
+  'content-writer': {
+    modelId: 'llama-3.2-3b',
+    systemPrompt: 'You are a professional content writer. Write engaging, well-structured articles and copy.',
+    tools: ['text-generator', 'markdown-formatter', 'grammar-checker'],
+    maxTokens: 4096,
+    temperature: 0.8,
+  },
+  'image-optimizer': {
+    modelId: 'flux-1-dev',
+    systemPrompt: 'You are an image generation and optimization specialist. Generate, upscale, and optimize images.',
+    tools: ['image-generator', 'upscaler', 'watermark'],
+    maxTokens: 1024,
+    temperature: 0.9,
+  },
+};
+
+export function createAgentFromTemplate(templateName: string, agentId: string): AgentRuntime {
+  const template = AGENT_TEMPLATES[templateName];
+  if (!template) throw new Error(`Unknown template: ${templateName}`);
+  return new AgentRuntime(
+    Object.assign({}, template, { agentId }) as AgentConfig,
+  );
+}
+
 export function inferenceCheckpointForward(
   input: Float32Array, weights: Float32Array, hiddenDim: number, layerIdx: number, pos: number,
 ): ActivationCheckpoint {

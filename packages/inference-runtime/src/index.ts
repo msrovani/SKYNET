@@ -22,3 +22,5 @@ export {
   type Quantization,
   type DownloadProgress,
 } from './model-loader.js';
+
+export { AgentModel, type AgentModelConfig, type ToolAdapter, type AgentTurnResult } from './agent-model.js';

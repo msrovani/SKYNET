@@ -48,10 +48,16 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 18. Planner é um Agente (não módulo fixo) — evolui via EvolutionEngine tal como outros agentes
 19. Topologia Híbrida (τX) como Default — paralelo dentro de layers, sequencial entre layers
 
-## Estado Atual (Sprint 4a — Agentic Mesh: Semantic Router)
+## Estado Atual (Sprint 4d — Agentic Mesh: Release v0.3.0)
 - **Build 8/8 packages OK** via `pnpm build` (Turborepo v2.9.16)
-- **pnpm test**: 14/14 tasks, **124 testes** passando (24 core-wasm-engine + 100 p2p-mesh-network)
-- **WASM**: 168KB. JS glue: 34KB. Types: 8KB.
+- **pnpm test**: 15/15 tasks, **194 testes** passando (41 core-wasm-engine + 5 blockchain-client + 7 inference-runtime + 16 desktop-node-agent + 125 p2p-mesh-network)
+- **WASM**: 178KB. JS glue: 35KB. Types: 9KB.
+- **Agent Runtime** (`agent_runtime.rs`): Struct Rust com AgentConfig, AgentInput/Output, ToolCall, ciclo de vida (Idle→Loading→Ready→Executing→Completed). `AgentRuntime` class TS com `load()`/`execute()`/`reset()`. 12 testes.
+- **Agent Templates** (`AGENT_TEMPLATES`): 3 templates pré-definidos — `webdesign` (qwen-2.5-7b-int4), `content-writer` (llama-3.2-3b), `image-optimizer` (flux-1-dev). Factory `createAgentFromTemplate()`.
+- **Agent Host** (`agent-host.ts`): Desktop node agent manager com spawn/execute/stop de agentes, 9 builtin tools (html-renderer, css-generator, text-generator, etc.), status tracking, max agents limit. 16 testes + E2E.
+- **Agent Model** (`agent-model.ts`): Inference runtime adapter com ExecuTorch, tool call detection, context-aware prompt building. 7 testes.
+- **x402 Agent Payments** (`agent-payments.ts`): Blockchain microtx manager para agent payments, quote/verify flow via Solana x402. 5 testes.
+- **E2E Agentic Mesh** (`e2e-agentic-mesh.test.ts`): 5 testes de integração — lifecycle completo, multi-agent, cross-template, confidence/latency checks.
 - **wasm-bindgen-cli 0.2.122** baixado precompilado do GitHub (avoid MSVC linker). Local: `%TEMP%\wasm-bindgen\wasm-bindgen-0.2.122-x86_64-pc-windows-msvc\wasm-bindgen.exe`
 - **build.cjs**: cargo build → wasm-bindgen (temp ASCII `%TEMP%\skynet-wasm-build`) → copy to dist/ → tsc
 - **stub/index.ts**: lazy WASM loading via `Function('return import("./core_wasm_engine.js")')()` com fallback TS puro. 18+ funções exportadas.
@@ -126,9 +132,9 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **ExecuTorch Device Test** — precisa de dispositivo físico (Android/iOS com ExecuTorch)
 - **Cross-Platform CI verification** — verificar status em github.com/msrovani/SKYNET/actions
 - **WASM em Safari/Firefox** — testes cross-browser pendentes
-- **Sprint 4b: Agentic Mesh** — DAG Planner + Fraction Aggregator + TopologyRouter
-- **Sprint 4c: Agentic Mesh** — Agent Runtime (Rust) + AgentHost (Tauri)
-- **Sprint 4d: Agentic Mesh** — UI Agent Query + x402 payments + Release
+- **~~Sprint 4b: Agentic Mesh~~** — ~~DAG Planner + Fraction Aggregator + TopologyRouter~~ (CONCLUÍDO)
+- **~~Sprint 4c: Agentic Mesh~~** — ~~Agent Runtime (Rust) + AgentHost (Tauri)~~ (CONCLUÍDO)
+- **~~Sprint 4d: Agentic Mesh~~** — ~~UI Agent Query + x402 payments + Release~~ (CONCLUÍDO)
 
 ## Comandos
 - `pnpm install` — instalar deps

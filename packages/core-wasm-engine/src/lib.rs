@@ -11,6 +11,7 @@ mod autonomous;
 mod knowledge_graph;
 mod context_prune;
 mod inference;
+mod agent_runtime;
 
 #[wasm_bindgen]
 pub fn get_thermal_headroom() -> f64 {
@@ -310,6 +311,83 @@ pub fn create_kv_cache(config: JsValue) -> JsValue {
         });
     let cache = inference::create_kv_cache(&cfg);
     serde_wasm_bindgen::to_value(&cache).unwrap_or(JsValue::NULL)
+}
+
+// -- Agent Runtime exports --
+
+#[wasm_bindgen]
+pub fn agent_runtime_new(config: JsValue) -> JsValue {
+    if let Ok(cfg) = serde_wasm_bindgen::from_value::<agent_runtime::AgentConfig>(config) {
+        let rt = agent_runtime::AgentRuntime::new(cfg);
+        return serde_wasm_bindgen::to_value(&rt).unwrap_or(JsValue::NULL);
+    }
+    JsValue::NULL
+}
+
+#[wasm_bindgen]
+pub fn agent_runtime_load(rt: JsValue) -> JsValue {
+    let mut rt: agent_runtime::AgentRuntime =
+        serde_wasm_bindgen::from_value(rt).unwrap_or(
+            agent_runtime::AgentRuntime::new(agent_runtime::AgentConfig {
+                agent_id: "fallback".into(),
+                model_id: "none".into(),
+                system_prompt: "".into(),
+                tools: vec![],
+                max_tokens: 0,
+                temperature: 0.0,
+            }),
+        );
+    match rt.load() {
+        Ok(()) => serde_wasm_bindgen::to_value(&rt).unwrap_or(JsValue::NULL),
+        Err(e) => JsValue::from_str(&e),
+    }
+}
+
+#[wasm_bindgen]
+pub fn agent_runtime_execute(rt: JsValue, input: JsValue) -> JsValue {
+    let mut rt: agent_runtime::AgentRuntime =
+        serde_wasm_bindgen::from_value(rt).unwrap_or(
+            agent_runtime::AgentRuntime::new(agent_runtime::AgentConfig {
+                agent_id: "fallback".into(),
+                model_id: "none".into(),
+                system_prompt: "".into(),
+                tools: vec![],
+                max_tokens: 0,
+                temperature: 0.0,
+            }),
+        );
+    if let Ok(inp) = serde_wasm_bindgen::from_value::<agent_runtime::AgentInput>(input) {
+        match rt.execute(&inp) {
+            Ok(output) => return serde_wasm_bindgen::to_value(&output).unwrap_or(JsValue::NULL),
+            Err(e) => return JsValue::from_str(&e),
+        }
+    }
+    JsValue::NULL
+}
+
+#[wasm_bindgen]
+pub fn agent_runtime_state(rt: JsValue) -> JsValue {
+    if let Ok(rt) = serde_wasm_bindgen::from_value::<agent_runtime::AgentRuntime>(rt) {
+        return serde_wasm_bindgen::to_value(rt.state()).unwrap_or(JsValue::NULL);
+    }
+    JsValue::NULL
+}
+
+#[wasm_bindgen]
+pub fn agent_runtime_reset(rt: JsValue) -> JsValue {
+    let mut rt: agent_runtime::AgentRuntime =
+        serde_wasm_bindgen::from_value(rt).unwrap_or(
+            agent_runtime::AgentRuntime::new(agent_runtime::AgentConfig {
+                agent_id: "fallback".into(),
+                model_id: "none".into(),
+                system_prompt: "".into(),
+                tools: vec![],
+                max_tokens: 0,
+                temperature: 0.0,
+            }),
+        );
+    rt.reset();
+    serde_wasm_bindgen::to_value(&rt).unwrap_or(JsValue::NULL)
 }
 
 #[wasm_bindgen]
