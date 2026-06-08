@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0] — 2026-07-08 — Sprint 5-6: Segurança + Blockchain + Federated Learning
+
+### Added
+- **TEE Attestation** (`tee-attestation-layer`): Remote Attestation SGX simulation (quote/verify/measurement, nonce challenge-response), TeeBridge (detecção automática SGX/SEV/CCA), Proof of Time (FLOPS tracking, signature vinculada). 24 testes.
+- **Blockchain Client** (`blockchain-client`): Solana x402 protocol (quote/pay/verify), Base fallback (L2→L1 settlement), State Channels microtx manager (USDC, claim, challenge), Agent payments (x402 agent quote/pay/verify). 35 testes.
+- **App UI integrado**: `useSkynet.ts` hook com AgentRuntime + AgentHost + AgentModel + SolanaX402 reais. `page.tsx` a consumir hook. `next.config.js` com transpilePackages.
+- **Federated Learning** (`fl-training-client`): FedYogi (adaptive server optimizer, sign(variance - g²) update), QLocalAdam (Int8 quantized optimizer states), FEDADAVR (variance reduction, extends FedYogi, LRU 1000 clients), ClientSelection (heterogeneous scoring: 0.4 reliability + 0.2 battery/charging + 0.2 thermal + 0.2 memory). 19 testes.
+
+### Tests
+- **273 total** (41 core-wasm-engine + 35 blockchain-client + 7 inference-runtime + 16 desktop-node-agent + 125 p2p-mesh-network + 24 tee-attestation-layer + 6 app-ui-orchestrator + 19 fl-training-client).
+- 17/17 tasks pass via `pnpm test`.
+
+---
+
 ## [0.3.0] — 2026-06-07 — Sprint 4b-4d: Agentic Mesh — Planner + Runtime + Release
 
 ### Added

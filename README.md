@@ -4,8 +4,8 @@
 
 [![CI](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml/badge.svg)](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.4.0-green.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-124%20passing-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/version-0.5.0-green.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-273%20passing-brightgreen.svg)]()
 
 ---
 
@@ -347,8 +347,8 @@ Sprint 4a ████████████████████ 100%  Age
 Sprint 4b ████████████████████ 100%  Agentic Mesh: Planner + Aggregator
 Sprint 4c ████████████████████ 100%  Agentic Mesh: Agent Runtime + Desktop
 Sprint 4d ████████████████████ 100%  Agentic Mesh: UI + Payments + Release
-Sprint 5 ░░░░░░░░░░░░░░░░░░░░   0%  Segurança + Blockchain
-Sprint 6 ░░░░░░░░░░░░░░░░░░░░   0%  Federated Learning
+Sprint 5 ████████████████████ 100%  TEE Attestation + Blockchain Client
+Sprint 6 ████████████████████ 100%  Federated Learning
 Sprint 7 ░░░░░░░░░░░░░░░░░░░░   0%  Integração + Beta
 ```
 
@@ -357,7 +357,7 @@ Sprint 7 ░░░░░░░░░░░░░░░░░░░░   0%  Inte
 | Componente | Estado |
 |-----------|--------|
 | `pnpm install` + `pnpm build` | ✅ 8/8 packages |
-| `pnpm test` | ✅ 194 testes passam (41 core-wasm + 5 blockchain + 7 inference + 16 desktop + 125 p2p) |
+| `pnpm test` | ✅ 273 testes passam (41 core-wasm + 35 blockchain + 7 inference + 16 desktop + 125 p2p + 24 tee + 6 app-ui + 19 fl) |
 | WebTransport echo demo (`pnpm example:echo`) | ✅ QUIC ~170ms, roundtrip ~15ms |
 | Pipeline Parallelism (código + testes) | ✅ Layer partition por capacidade |
 | Segment Means compression (código + testes) | ✅ Compressão lossy de ativações |
@@ -377,22 +377,25 @@ Sprint 7 ░░░░░░░░░░░░░░░░░░░░   0%  Inte
 | E2E Agentic Mesh (testes) | ✅ 5 testes (lifecycle, multi-agent) |
 | WASM core (Rust → WebAssembly) | ✅ 178KB otimizado |
 | App UI (React Native + Next.js PWA) | ✅ Scaffolds com 3 modos + monetização |
+| App UI integrado (useSkynet real) | ✅ AgentRuntime + AgentHost + AgentModel + x402 |
+| TEE Remote Attestation (código + testes) | ✅ 24 testes (SGX sim, bridge, Proof of Time) |
+| Solana x402 + Base fallback + State Channels | ✅ 35 testes (quote, pay, verify, microtx) |
+| Federated Learning (FedYogi + QLocalAdam + FEDADAVR + ClientSelection) | ✅ 19 testes, todos os 4 módulos |
 
 ### O que NÃO funciona ainda (próximas sprints)
 
 | Funcionalidade | Previsão |
 |---------------|----------|
-| **Remote Attestation (TEE)** | Sprint 5 |
-| **Solana x402 integração real** | Sprint 5 |
-| **State Channels USDC on-chain** | Sprint 5 |
-| **Federated Learning (FedYogi, Q-LocalAdam)** | Sprint 6 |
 | **Beta fechado (20 empresas)** | Sprint 7 |
-| **Agent Runtime (Rust → WASM)** | Sprint 4c |
-| **Agent UI + x402 payments** | Sprint 4d |
-| **Blockchain (x402, State Channels)** | Sprint 5 |
-| **Federated Learning em dispositivos** | Sprint 6 |
-| **TEE Remote Attestation** | Sprint 5 |
 | **Beta público instalável** | Sprint 7 (target) |
+| **iOS (CoreML via ExecuTorch)** | Backlog |
+| **Smart TVs (PWA + WebGPU)** | Backlog |
+| **ARM CCA nativo** | Backlog |
+| **zk-SNARKs FL verificável** | Backlog |
+| **Multi-chain (Polygon, Arbitrum)** | Backlog |
+| **Plugin system para modelos customizados** | Backlog |
+| **LoRaWAN + acústica ultrassónica (ADR-015)** | Backlog |
+| **Circadian-Aware Scheduling (ADR-014)** | Backlog |
 
 > **⚠️ SKYNET está em desenvolvimento ativo (Pre-Alpha).** Código funcional, testado e buildável — mas não instalável por utilizadores finais. Se és developer ou early adopter, contribui ou acompanha em [github.com/msrovani/SKYNET](https://github.com/msrovani/SKYNET).
 

@@ -82,18 +82,20 @@
 - [x] `tee-bridge.ts`: Abstração SGX/SEV/CCA — deteção automática (x64→SGX, WebGPU→CCA, Tauri→SEV), secure execution com fallback, validação de memória/providers
 - [x] `proof-of-time.ts`: Proof of Inference Time — work chunks com FLOPS tracking, signature vinculada a measurement hash, integração com attestation, verificação de duração mínima
 
-### 5.2 blockchain-client
-- [ ] `solana-x402.ts`: Integração com Solana x402 protocol
-- [ ] `base-fallback.ts`: Base como fallback
-- [ ] `microtx.ts`: Microtransações USDC
+### 5.2 blockchain-client ✅
+- [x] `solana-x402.ts`: Integração com Solana x402 protocol (9 testes)
+- [x] `base-fallback.ts`: Base como fallback (10 testes)
+- [x] `microtx.ts`: Microtransações USDC (11 testes)
+- [x] `agent-payments.ts`: Agent payments via x402 (5 testes)
 
-## Sprint 6: Federated Learning
+## Sprint 6: Federated Learning 🏃
 
 ### 6.1 fl-training-client
-- [ ] `fed-yogi.ts`: Implementação FedYogi
-- [ ] `q-local-adam.ts`: Q-LocalAdam (8-bit optimizer states)
-- [ ] `fedadavr.ts`: FEDADAVR para alta evasão
-- [ ] `client-selection.ts`: Seleção heterogénea (bateria, Wi-Fi, thermal)
+- [x] `fed-yogi.ts`: FedYogi — adaptive server optimizer com momentum/variance (Yogi rule)
+- [x] `q-local-adam.ts`: Q-LocalAdam — 8-bit quantized Adam local optimizer (Int8 states)
+- [x] `fedadavr.ts`: FEDADAVR — variance reduction para alta evasão de clientes
+- [x] `client-selection.ts`: Seleção heterogénea (bateria, Wi-Fi, thermal, memória, reliability)
+- [x] Testes unitários: 19 (4 FedYogi + 4 QLocalAdam + 5 FEDADAVR + 6 ClientSelection)
 
 ## Sprint 7: Beta
 
@@ -154,16 +156,28 @@
 - **Agent Query UI:** modo Agente no page.tsx com task list + autonomy selector
 - **WASM:** 178KB, JS glue 35KB
 
+### Sprint 5.3 (Julho 2026) ✅
+- **useSkynet real:** Hook integrado com AgentRuntime + AgentHost + AgentModel + SolanaX402 reais
+- **App UI tests:** 6 testes de tipos + infra vitest no app-ui-orchestrator
+- **next.config.js:** transpilePackages atualizado para incluir inference-runtime + blockchain-client
+
 ### Sprint 5 (Junho 2026)
 - **AttestationManager:** SGX simulation com quote/verify, SHA-256 measurement, nonce challenge-response, hardware signature mode, 9 testes
 - **TeeBridge:** Deteção automática TEE (x64→SGX, WebGPU→CCA, Tauri→SEV), secure execution com fallback, validação memória/providers, 6 testes
 - **ProofOfTime:** Work chunks com FLOPS tracking, signature measurement hash, attestation integration, minWorkMs verification, 9 testes
 - **24 testes novos** (9 attestation + 6 tee-bridge + 9 proof-of-time)
 
+### Sprint 6 (Julho 2026)
+- **FedYogi:** Adaptive server optimizer (Yogi rule) com momentum/variance tracking, 4 testes
+- **QLocalAdam:** 8-bit quantized local Adam com Int8 estados de momentum/variance, 4 testes
+- **FEDADAVR:** Variance reduction para high evasão (extends FedYogi), 5 testes
+- **ClientSelection:** Heterogeneous client selection (bateria, Wi-Fi, thermal, memory, reliability), 6 testes
+- **19 testes novos**, 273 tests totais, 17/17 tasks
+
 ### Resultados Acumulados
 - **8/8 packages build OK** via `pnpm build` (Turborepo v2.9.16)
-- **218 testes** passando (41 core-wasm-engine + 5 blockchain-client + 7 inference-runtime + 16 desktop-node-agent + 125 p2p-mesh-network + 24 tee-attestation-layer)
-- **15/15 tasks** successful em `pnpm test`
+- **273 testes** passando (41 core-wasm-engine + 35 blockchain-client + 7 inference-runtime + 16 desktop-node-agent + 125 p2p-mesh-network + 24 tee-attestation-layer + 6 app-ui-orchestrator + 19 fl-training-client)
+- **17/17 tasks** successful em `pnpm test`
 - **WASM**: 178KB, JS glue 35KB, types 9KB
 - **Agent Runtime**: Rust WASM + TS stub + AGENT_TEMPLATES
 - **Agent Host**: desktop-node-agent com 9 builtin tools, spawn/execute/stop

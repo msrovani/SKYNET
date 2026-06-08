@@ -48,9 +48,9 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 18. Planner é um Agente (não módulo fixo) — evolui via EvolutionEngine tal como outros agentes
 19. Topologia Híbrida (τX) como Default — paralelo dentro de layers, sequencial entre layers
 
-## Estado Atual (Sprint 4d — Agentic Mesh: Release v0.3.0)
+## Estado Atual (Sprint 6 — Federated Learning: Release v0.5.0)
 - **Build 8/8 packages OK** via `pnpm build` (Turborepo v2.9.16)
-- **pnpm test**: 15/15 tasks, **194 testes** passando (41 core-wasm-engine + 5 blockchain-client + 7 inference-runtime + 16 desktop-node-agent + 125 p2p-mesh-network)
+- **pnpm test**: 17/17 tasks, **273 testes** passando (41 core-wasm-engine + 35 blockchain-client + 7 inference-runtime + 16 desktop-node-agent + 125 p2p-mesh-network + 24 tee-attestation-layer + 6 app-ui-orchestrator + 19 fl-training-client)
 - **WASM**: 178KB. JS glue: 35KB. Types: 9KB.
 - **Agent Runtime** (`agent_runtime.rs`): Struct Rust com AgentConfig, AgentInput/Output, ToolCall, ciclo de vida (Idle→Loading→Ready→Executing→Completed). `AgentRuntime` class TS com `load()`/`execute()`/`reset()`. 12 testes.
 - **Agent Templates** (`AGENT_TEMPLATES`): 3 templates pré-definidos — `webdesign` (qwen-2.5-7b-int4), `content-writer` (llama-3.2-3b), `image-optimizer` (flux-1-dev). Factory `createAgentFromTemplate()`.
@@ -75,6 +75,7 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **App UI**: React Native (Expo) + Next.js PWA scaffolds com 3 modos de IA (⚡Relâmpago, 🔬Profundo, 🤖Agente) + toggle de monetização 🌙. Web app build OK.
 - **Cross-Platform CI**: `.github/workflows/ci.yml` com matrix `[ubuntu, macos, windows]`
 - **Rust toolchain**: 1.96.0 (stable-x86_64-pc-windows-gnu), target `wasm32-unknown-unknown`
+- **App UI integrado**: `useSkynet.ts` hook real com AgentRuntime + AgentHost + AgentModel + SolanaX402, `page.tsx` a usar hook, `next.config.js` com transpilePackages.
 - **8 pacotes estáveis** com tsconfig, exports completos, sem referências circulares.
 
 ### Bugs Conhecidos
@@ -115,6 +116,10 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **embedText hash-based**: determinístico para texto idêntico (cosine=1), pseudo-aleatório para textos diferentes. Não captura semântica — placeholder até integration com SBERT
 - **Testes com hash embeddings**: só comparar identical string (sim=1) vs different string (sim<1); não assumir similaridade semântica real
 - **Event system**: padrão onEvent/emit com Set<Callback> e cleanup function; tolerante a handlers com erro (try-catch no loop)
+- **FedYogi**: Yogi adaptive optimizer usa sign(variance - g^2) para update rule, diferente de AdamW; learning rate server-side separado do client-side
+- **QLocalAdam**: Int8 quantization para estados de optimizer requer range calibration (momentum ~[-0.1, 0.1], variance em escala log-exp); bias correction integrado
+- **FEDADAVR**: Variance reduction via histórico de updates do cliente; extends FedYogi herdando aggregateClientUpdates; LRU eviction de 1000 clients
+- **ClientSelection**: Score ponderado (0.4 reliability + 0.2 charging/battery + 0.2 thermal + 0.2 memory); filtragem por requisitos mínimos antes de scoring
 
 ## Tarefas Pendentes
 - ~~**WebTransport funcional entre 2 peers reais** — CONCLUÍDO! `pnpm example:echo` funcional~~
@@ -132,9 +137,6 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **ExecuTorch Device Test** — precisa de dispositivo físico (Android/iOS com ExecuTorch)
 - **Cross-Platform CI verification** — verificar status em github.com/msrovani/SKYNET/actions
 - **WASM em Safari/Firefox** — testes cross-browser pendentes
-- **~~Sprint 4b: Agentic Mesh~~** — ~~DAG Planner + Fraction Aggregator + TopologyRouter~~ (CONCLUÍDO)
-- **~~Sprint 4c: Agentic Mesh~~** — ~~Agent Runtime (Rust) + AgentHost (Tauri)~~ (CONCLUÍDO)
-- **~~Sprint 4d: Agentic Mesh~~** — ~~UI Agent Query + x402 payments + Release~~ (CONCLUÍDO)
 
 ## Comandos
 - `pnpm install` — instalar deps

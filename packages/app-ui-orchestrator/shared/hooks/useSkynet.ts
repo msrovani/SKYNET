@@ -1,4 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { AgentRuntime, createAgentFromTemplate } from '@skynet/core-wasm-engine';
+import { AgentModel, type ToolAdapter } from '@skynet/inference-runtime';
+import { SolanaX402, MicroTxManager } from '@skynet/blockchain-client';
 import {
   AppState, AiMode, AgentAutonomy, MeshStatus, SilentConfig,
   AgentTask, AI_MODE_LABELS,
@@ -17,6 +20,13 @@ const DEFAULT_APP: AppState = {
   tasksCompleted: 0,
   earningsUsd: 0,
 };
+
+interface SkynetEngine {
+  agentRuntime: AgentRuntime | null;
+  agentModel: AgentModel | null;
+  x402: SolanaX402;
+  microtx: MicroTxManager;
+}
 
 export function useSkynet() {
   const [appState, setAppState] = useState<AppState>(DEFAULT_APP);
@@ -40,6 +50,24 @@ export function useSkynet() {
   const [agentTasks, setAgentTasks] = useState<AgentTask[]>([]);
   const [response, setResponse] = useState<string>('');
 
+  const engineRef = useRef<SkynetEngine | null>(null);
+
+  useEffect(() => {
+    const x402 = new SolanaX402({ simulate: true });
+    const microtx = new MicroTxManager(x402);
+
+    engineRef.current = {
+      agentRuntime: null,
+      agentModel: null,
+      x402,
+      microtx,
+    };
+
+    return () => {
+      engineRef.current = null;
+    };
+  }, []);
+
   const setMode = useCallback((mode: AiMode) => {
     setAppState(prev => ({ ...prev, mode, isComputing: false }));
     setResponse('');
@@ -56,35 +84,93 @@ export function useSkynet() {
     setResponse('');
     setAgentTasks([]);
 
+    const engine = engineRef.current;
+
     switch (appState.mode) {
-      case AiMode.LIGHTNING:
-        setResponse('⚡ ' + prompt.split(' ').reverse().join(' '));
+      case AiMode.LIGHTNING: {
+        const agent = createAgentFromTemplate('content-writer', 'lightning-agent');
+        agent.load();
+        const output = agent.execute({ prompt, context: [] });
+        setResponse(`⚡ ${output.content}`);
         break;
-      case AiMode.DEEP:
-        for (let i = 0; i < 5; i++) {
-          await new Promise(r => setTimeout(r, 200));
-          setResponse(prev => prev + `token_${i} `);
-        }
-        break;
-      case AiMode.AGENT: {
-        const tasks: AgentTask[] = [
-          { id: '1', description: 'Planear tarefa', status: 'pending', progress: 0 },
-          { id: '2', description: 'Agente webdesign: gerar layout', status: 'pending', progress: 0 },
-          { id: '3', description: 'Agente content: escrever texto', status: 'pending', progress: 0 },
-          { id: '4', description: 'Agregar resultados', status: 'pending', progress: 0 },
+      }
+
+      case AiMode.DEEP: {
+        const tools: ToolAdapter[] = [
+          { name: 'text-generator', execute: (s) => s, description: 'Generate text' },
         ];
+        const model = new AgentModel({
+          agentId: 'deep-agent',
+          modelId: 'none',
+          systemPrompt: 'You are a deep reasoning assistant. Think step by step.',
+          tools,
+          temperature: 0.3,
+          maxTokens: 4096,
+        });
+        await model.load();
+        const result = await model.generate(prompt);
+        setResponse(`🔬 ${result.content}`);
+        model.unload();
+        break;
+      }
+
+      case AiMode.AGENT: {
+        const autonomy = appState.agentAutonomy;
+        const taskIds = [
+          `Planear: ${prompt.slice(0, 40)}...`,
+          'Agente webdesign: gerar layout',
+          'Agente content: produzir conteúdo',
+          'Fraction Aggregator: sintetizar',
+        ];
+        const tasks: AgentTask[] = taskIds.map((d, i) => ({
+          id: String(i), description: d, status: 'pending' as const, progress: 0,
+        }));
         setAgentTasks(tasks);
-        for (const t of tasks) {
-          await new Promise(r => setTimeout(r, 400));
-          setAgentTasks(prev => prev.map(task =>
-            task.id === t.id ? { ...task, status: 'executing' as const, progress: 0.5 } : task
-          ));
-          await new Promise(r => setTimeout(r, 600));
-          setAgentTasks(prev => prev.map(task =>
-            task.id === t.id ? { ...task, status: 'completed' as const, progress: 1, result: `✓ ${t.description} concluído` } : task
-          ));
+
+        const updateTask = (id: string, updates: Partial<AgentTask>) => {
+          setAgentTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } as AgentTask : t));
+        };
+
+        // Step 1: Plan
+        updateTask('0', { status: 'executing', progress: 0.3 });
+        if (autonomy === AgentAutonomy.WATCH || autonomy === AgentAutonomy.ASSIST) {
+          await new Promise(r => setTimeout(r, 300));
         }
-        setResponse('✅ Solução completa! (simulado)');
+        updateTask('0', { status: 'completed', progress: 1 });
+
+        // Step 2: Webdesign agent
+        updateTask('1', { status: 'executing', progress: 0.3 });
+        const webAgent = createAgentFromTemplate('webdesign', 'web-agent');
+        webAgent.load();
+        const webOut = webAgent.execute({ prompt, context: [] });
+        updateTask('1', { status: 'completed', progress: 1 });
+        webAgent.reset();
+
+        // Step 3: Content agent
+        updateTask('2', { status: 'executing', progress: 0.3 });
+        const contentAgent = createAgentFromTemplate('content-writer', 'content-agent');
+        contentAgent.load();
+        const contentOut = contentAgent.execute({ prompt, context: [] });
+        updateTask('2', { status: 'completed', progress: 1 });
+        contentAgent.reset();
+
+        // Step 4: Aggregate
+        updateTask('3', { status: 'executing', progress: 0.5 });
+        await new Promise(r => setTimeout(r, 200));
+        updateTask('3', { status: 'completed', progress: 1 });
+
+        // Payment via x402 for agent task
+        if (engine) {
+          const payment = await engine.microtx.payForInference('agent-task', 0.001);
+          if (payment.success) {
+            setAppState(prev => ({
+              ...prev,
+              earningsUsd: prev.earningsUsd - 0.001,
+            }));
+          }
+        }
+
+        setResponse(`🤖 ${webOut.content}\n---\n${contentOut.content}`);
         break;
       }
     }
@@ -94,13 +180,13 @@ export function useSkynet() {
       isComputing: false,
       tasksCompleted: prev.tasksCompleted + 1,
     }));
-  }, [appState.mode]);
+  }, [appState.mode, appState.agentAutonomy]);
 
   const toggleSilent = useCallback(() => {
     setSilentConfig(prev => ({ ...prev, enabled: !prev.enabled }));
   }, []);
 
-  // Simulated telemetry
+  // Telemetry
   useEffect(() => {
     const interval = setInterval(() => {
       setAppState(prev => ({

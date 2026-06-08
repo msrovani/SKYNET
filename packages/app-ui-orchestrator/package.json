@@ -8,23 +8,25 @@
     "dev:web": "cd apps/web && next dev",
     "build:mobile": "cd apps/mobile && npx expo build",
     "build:web": "cd apps/web && next build",
-    "lint": "eslint 'apps/**/*.{ts,tsx}' 'shared/**/*.{ts,tsx}'"
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint apps/ shared/"
   },
   "dependencies": {
-    "@skynet/core-wasm-engine": "workspace:*",
-    "@skynet/p2p-mesh-network": "workspace:*",
-    "@skynet/inference-runtime": "workspace:*",
     "@skynet/blockchain-client": "workspace:*",
+    "@skynet/core-wasm-engine": "workspace:*",
     "@skynet/fl-training-client": "workspace:*",
+    "@skynet/inference-runtime": "workspace:*",
+    "@skynet/p2p-mesh-network": "workspace:*",
     "@skynet/tee-attestation-layer": "workspace:*",
     "next": "^15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
-    "eslint": "^8.57.0",
     "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.0",
+    "vitest": "1.6.1"
   }
 }
