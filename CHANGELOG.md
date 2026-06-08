@@ -1,6 +1,30 @@
 # Changelog
 
-## [0.4.0] — 2026-06-07 — Sprint 4a: Agentic Mesh — Semantic Router
+## [0.3.0] — 2026-06-07 — Sprint 4b-4d: Agentic Mesh — Planner + Runtime + Release
+
+### Added
+- **TaskPlanner** (`planner.ts`): Decompõe prompts em DAGs com 4 templates (webdesign/content/image/analysis), critical path depth, layer grouping. 8 tests.
+- **TopologyRouter** (`topology-router.ts`): AdaptOrch com 4 topologias (parallel/sequential/hierarchical/hybrid), metrics parallelismWidth/criticalPathDepth/coupling. 5 tests.
+- **FractionAggregator** (`fraction-aggregator.ts`): Valida checksums (BLAKE3), merge HTML+CSS→página, JSON→merge, texto→markdown, consistência CSS/HTML class overlap, refinamento multi-round. 10 tests.
+- **Agent Runtime Rust** (`agent_runtime.rs`): AgentConfig, AgentInput/Output, ToolCall, ciclo de vida (Idle→Loading→Ready→Executing→Completed). WASM exports + TS stub.
+- **Agent Templates** (`AGENT_TEMPLATES`): 3 templates — webdesign (qwen-2.5-7b-int4), content-writer (llama-3.2-3b), image-optimizer (flux-1-dev). Factory `createAgentFromTemplate()`.
+- **AgentHost** (`agent-host.ts`): Desktop node agent manager com spawn/execute/stop, 9 builtin tools (html-renderer, css-generator, text-generator, markdown-formatter, grammar-checker, image-generator, upscaler, watermark, cdn-upload), max agents limit, status tracking. 16 tests.
+- **AgentModel** (`agent-model.ts`): Inference adapter com ExecuTorch, tool call detection via regex, context-aware prompt building. 7 tests.
+- **AgentX402Payments** (`agent-payments.ts`): Flow quote/pay/verify para agent payments via Solana x402 + microtx manager. 5 tests.
+- **Agent Query UI**: Modo "Agente" no app-ui-orchestrator page.tsx com task list dinâmica e autonomy selector (Vigiar/Assistir/Auto).
+- **E2E Agentic Mesh** (`e2e-agentic-mesh.test.ts`): 5 testes de integração — lifecycle completo, multi-agent, cross-template, confidence/latency checks.
+
+### Infrastructure
+- 19 ADRs documentados.
+- Agent Runtime Rust → WASM (178KB) + TS glue (35KB) + types (9KB).
+
+### Tests
+- **194 total** (41 core-wasm-engine + 5 blockchain-client + 7 inference-runtime + 16 desktop-node-agent + 125 p2p-mesh-network).
+- 15/15 tasks pass via `pnpm test`.
+
+---
+
+## [0.2.0] — 2026-06-07 — Sprint 4a: Agentic Mesh — Semantic Router
 
 ### Added
 - **VCapabilityVector** (`capability.ts`): Versioned Capability Vectors com embeddings semânticos. `embedText()` gera vector normalizado hash-based, `cosineSimilarity()` para comparação.

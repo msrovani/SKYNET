@@ -344,9 +344,9 @@ Sprint 1 ████████████████████ 100%  Fund
 Sprint 2 ████████████████████ 100%  Mesh Local L1 (DSD, Inference pipeline, Checkpoints)
 Sprint 3 ████████████████████ 100%  Mobile App + Thermal
 Sprint 4a ████████████████████ 100%  Agentic Mesh: Semantic Router + HNSW
-Sprint 4b ░░░░░░░░░░░░░░░░░░░  0%  Agentic Mesh: Planner + Aggregator
-Sprint 4c ░░░░░░░░░░░░░░░░░░░  0%  Agentic Mesh: Agent Runtime + Desktop
-Sprint 4d ░░░░░░░░░░░░░░░░░░░  0%  Agentic Mesh: UI + Payments + Release
+Sprint 4b ████████████████████ 100%  Agentic Mesh: Planner + Aggregator
+Sprint 4c ████████████████████ 100%  Agentic Mesh: Agent Runtime + Desktop
+Sprint 4d ████████████████████ 100%  Agentic Mesh: UI + Payments + Release
 Sprint 5 ░░░░░░░░░░░░░░░░░░░░   0%  Segurança + Blockchain
 Sprint 6 ░░░░░░░░░░░░░░░░░░░░   0%  Federated Learning
 Sprint 7 ░░░░░░░░░░░░░░░░░░░░   0%  Integração + Beta
@@ -357,7 +357,7 @@ Sprint 7 ░░░░░░░░░░░░░░░░░░░░   0%  Inte
 | Componente | Estado |
 |-----------|--------|
 | `pnpm install` + `pnpm build` | ✅ 8/8 packages |
-| `pnpm test` | ✅ 124 testes passam (24 core-wasm + 100 p2p) |
+| `pnpm test` | ✅ 194 testes passam (41 core-wasm + 5 blockchain + 7 inference + 16 desktop + 125 p2p) |
 | WebTransport echo demo (`pnpm example:echo`) | ✅ QUIC ~170ms, roundtrip ~15ms |
 | Pipeline Parallelism (código + testes) | ✅ Layer partition por capacidade |
 | Segment Means compression (código + testes) | ✅ Compressão lossy de ativações |
@@ -367,16 +367,26 @@ Sprint 7 ░░░░░░░░░░░░░░░░░░░░   0%  Inte
 | Thermal Management (código + testes) | ✅ 30 testes (zone/trend/cooldown/shift) |
 | Semantic Router (código + testes) | ✅ 22 testes (HNSW index + semantic matching) |
 | Agent Mesh Manager (código + testes) | ✅ 8 testes (registry, heartbeats, health) |
-| WASM core (Rust → WebAssembly) | ✅ 168KB otimizado |
+| DAG Task Planner (código + testes) | ✅ 8 testes (4 templates, critical path) |
+| Topology Router (código + testes) | ✅ 5 testes (AdaptOrch, 4 topologias) |
+| Fraction Aggregator (código + testes) | ✅ 10 testes (checksums, merge, consistency) |
+| Agent Runtime Rust (código + testes) | ✅ 12 testes (lifecycle, templates) |
+| Agent Host (desktop-node-agent + testes) | ✅ 16 testes (spawn/execute/stop, 9 tools) |
+| Agent Model (inference adapter + testes) | ✅ 7 testes (tool detection, prompt) |
+| x402 Agent Payments (código + testes) | ✅ 5 testes (quote/pay/verify) |
+| E2E Agentic Mesh (testes) | ✅ 5 testes (lifecycle, multi-agent) |
+| WASM core (Rust → WebAssembly) | ✅ 178KB otimizado |
 | App UI (React Native + Next.js PWA) | ✅ Scaffolds com 3 modos + monetização |
 
 ### O que NÃO funciona ainda (próximas sprints)
 
 | Funcionalidade | Previsão |
 |---------------|----------|
-| **Inferência real num PC** | Sprint 4c-5 |
-| **DAG Planner (decomposição de tarefas)** | Sprint 4b |
-| **Fraction Aggregator (síntese multi-agente)** | Sprint 4b |
+| **Remote Attestation (TEE)** | Sprint 5 |
+| **Solana x402 integração real** | Sprint 5 |
+| **State Channels USDC on-chain** | Sprint 5 |
+| **Federated Learning (FedYogi, Q-LocalAdam)** | Sprint 6 |
+| **Beta fechado (20 empresas)** | Sprint 7 |
 | **Agent Runtime (Rust → WASM)** | Sprint 4c |
 | **Agent UI + x402 payments** | Sprint 4d |
 | **Blockchain (x402, State Channels)** | Sprint 5 |
