@@ -27,7 +27,7 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - `app-ui-orchestrator` — React Native App + Next.js PWA, estados globais
 - `desktop-node-agent` — Tauri app (Rust: GPU detection, power mgmt, node service, TURN/STUN)
 
-## ADRs (15)
+## ADRs (19)
 1. WebTransport + Multipath QUIC > WebRTC (0-RTT, failover 4G/WiFi)
 2. ExecuTorch > ONNX Runtime (50KB, 12 backends, KleidiAI)
 3. FedYogi > FedAvg (+5-15% precisão, 0% falhas)
@@ -43,27 +43,32 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 13. Semantic Affinity Routing > latência física (rede = memória coletiva)
 14. Circadian-Aware Scheduling > distribuição uniforme (cargas seguem a noite)
 15. Opportunistic CRDT Transport > só IP (LoRa + acústica ultrassónica)
+16. Semantic Routing sobre HNSW > Routing por keyword (embeddings + cosine similarity para matching O(log N))
+17. Frações Imutáveis com Checksum (BLAKE3) — integridade garantida entre agentes
+18. Planner é um Agente (não módulo fixo) — evolui via EvolutionEngine tal como outros agentes
+19. Topologia Híbrida (τX) como Default — paralelo dentro de layers, sequencial entre layers
 
-## Estado Atual (Sprint 2 — Mesh Local L1)
+## Estado Atual (Sprint 4a — Agentic Mesh: Semantic Router)
 - **Build 8/8 packages OK** via `pnpm build` (Turborepo v2.9.16)
-- **pnpm test**: 14/14 tasks, **52 testes** passando (13 core-wasm-engine + 39 p2p-mesh-network)
-- **WASM**: 502KB → 153KB via wasm-bindgen 0.2.122 (69% reduction). JS glue: 30KB. Types: 6KB.
+- **pnpm test**: 14/14 tasks, **124 testes** passando (24 core-wasm-engine + 100 p2p-mesh-network)
+- **WASM**: 168KB. JS glue: 34KB. Types: 8KB.
 - **wasm-bindgen-cli 0.2.122** baixado precompilado do GitHub (avoid MSVC linker). Local: `%TEMP%\wasm-bindgen\wasm-bindgen-0.2.122-x86_64-pc-windows-msvc\wasm-bindgen.exe`
-- **build.cjs**: cargo build → wasm-bindgen (temp ASCII `%TEMP%\skynet-wasm-bindgen-out`) → copy to dist/ → tsc
-- **stub/index.ts**: lazy WASM loading via `Function('return import("./core_wasm_engine.js")')()` com fallback TS puro. 18 funções exportadas.
-- **Rust warnings 0/19** — `#![allow(dead_code)]` no crate root, 2 fix manuais (parêntesis, unused variable)
-- **GitHub**: `github.com/msrovani/SKYNET` — 3 commits (inicial, build loop fix, Sprint 2)
+- **build.cjs**: cargo build → wasm-bindgen (temp ASCII `%TEMP%\skynet-wasm-build`) → copy to dist/ → tsc
+- **stub/index.ts**: lazy WASM loading via `Function('return import("./core_wasm_engine.js")')()` com fallback TS puro. 18+ funções exportadas.
+- **Rust warnings 0/19** — `#![allow(dead_code)]` no crate root
+- **GitHub**: `github.com/msrovani/SKYNET` — tags v0.1.0, v0.2.0
 - **Pipeline Parallelism** (`pipeline.ts`): Particionamento proporcional de layers por capacidade (compute, VRAM, bandwidth). Suporte a falha de peer com reconfiguração de pipeline. 9 testes.
 - **Segment Means** (`segment-means.ts`): Compressão lossy de ativações via segment means. Configurável (segment size, adaptive mode). Ratio = segmentSize. 6 testes.
-- **p2p-mesh-network**: 39 testes. Cobre: TransportManager (WebTransport + WebRTC fallback), WebRTCFallback, CrdtSync (Automerge v2 CRUD + snapshots), FailoverManager, RoleElection, Capability, InstinctEngine, ExperimentTracker, PeerDiscovery, PipelineManager, SegmentMeans
-- **WebTransport Hello World FUNCIONAL!** `@moq/web-transport` v0.1.2 (napi-rs) server + client bidirectional stream echo. Conexão QUIC em ~170ms, roundtrip ~15ms. 3 scripts: `echo-server.ts`, `echo-client.ts`, `run-echo.ts`. Executar: `pnpm example:echo`
-- **Promise.withResolvers polyfill** necessário para Node.js v20 (nativo no v22+). Adicionado em todos os scripts echo.
-- **desktop-node-agent build.cjs**: corrigido (era loop recursivo `tauri build` → `npm run build` → `build.cjs`). Agora é stub.
-- **Tensor sharding**: 13 testes (row/col shard, reconstruct, verify, edge cases). Rust `tensor.rs` + TS stub.
-- **inference-runtime**: `ExecuTorchRuntime` reescrito com API ExecuTorch 1.2 — 5 backends, `getAvailableBackends()`, `recommendBackend()`, `estimateMemory()`, `loadFromBuffer()`, tipos `ExecuTorchTensor`. `ModelLoader` com streaming + progress callback. `KNOWN_MODELS` para Llama 3.2 1B/3B INT4.
-- **Cross-Platform CI**: `.github/workflows/ci.yml` expandido com matrix `[ubuntu, macos, windows]` para `build-ts`, `build-wasm`, `test`. WASM build usa `actions-rust-lang/setup-rust-toolchain` + wasm-bindgen-cli precompilado.
+- **Distributed Speculative Decoding** (`speculative-decoding.ts`): Draft/verify/rejection sampling, adaptive speculationLen. 11 testes.
+- **Thermal Management** (`thermal.ts`): ThermalManager (zone/trend/cooldown) + DynamicShifter (model chain). 30 testes (20+10).
+- **Semantic Router** (`semantic-router.ts`): `HnswIndex` (índice ANN hierárquico O(log N)), `SemanticRouter` (registo de agentes, matching semântico + tools, fallback, eventos). 22 testes (5 HnswIndex + 17 SemanticRouter).
+- **Agent Mesh Manager** (`agent-mesh.ts`): `AgentMeshManager` — registo local/remoto, heartbeats, health monitoring (detecção de degraded/offline), eventos de mesh. 8 testes.
+- **VCapabilityVector** (`capability.ts`): VCVs com embeddings semânticos (hash→vector normalizado), `embedText()`, `cosineSimilarity()`, extensão de `NodeCapability`.
+- **p2p-mesh-network**: 100 testes (6 ficheiros). Cobre: TransportManager, WebRTCFallback, CrdtSync, FailoverManager, RoleElection, Capability, InstinctEngine, ExperimentTracker, PeerDiscovery, PipelineManager, SegmentMeans, SpeculativeDecoder, ThermalManager, DynamicShifter, SemanticRouter, AgentMeshManager
+- **WebTransport Hello World FUNCIONAL!** `@moq/web-transport` v0.1.2 (napi-rs) server + client bidirectional stream echo. Conexão QUIC em ~170ms, roundtrip ~15ms. Executar: `pnpm example:echo`
+- **App UI**: React Native (Expo) + Next.js PWA scaffolds com 3 modos de IA (⚡Relâmpago, 🔬Profundo, 🤖Agente) + toggle de monetização 🌙. Web app build OK.
+- **Cross-Platform CI**: `.github/workflows/ci.yml` com matrix `[ubuntu, macos, windows]`
 - **Rust toolchain**: 1.96.0 (stable-x86_64-pc-windows-gnu), target `wasm32-unknown-unknown`
-- **Automerge v2** funcional: `init<T>`, `change<T>`, `save<T>`, `load<T>`.
 - **8 pacotes estáveis** com tsconfig, exports completos, sem referências circulares.
 
 ### Bugs Conhecidos
@@ -71,8 +76,15 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **Accented Windows paths** quebram GNU linker. WASM build usa `%TEMP%\skynet-wasm-build` (ASCII-only). `fork()` works com paths acentuados (Node.js gerencia internamente); `spawn()` quebra com `shell:true`.
 - **web-sys 0.3.99** lacks WebGPU bindings. WebGPU module stubbed.
 - **@moq/web-transport v0.1.2** `Request.ok()` retorna "request already consumed" se usado após `request.url`; ordem correcta: `url` antes de `ok()`.
+- **embedText() hash-based** não produz embeddings semanticamente significativos — é um hash determinístico normalizado. Substituir por sentence-transformer real quando disponível.
 
-### Lições Aprendidas
+### Rotina de Release
+- Cada sprint termina com: bump version → CHANGELOG update → README roadmap update → git tag
+- README mantém tabela "O que funciona HOJE" vs "O que NÃO funciona" com previsão de sprint
+- Roadmap visual com barras de progresso por sprint
+- `git tag -a vX.Y.Z -m "Sprint N: descrição"` + `git push origin main --tags`
+
+## Lições Aprendidas
 - `vi.stubGlobal()` + `vi.unstubAllGlobals()` > `vi.doMock()` para mockar globals como WebTransport/RTCPeerConnection
 - Automerge v2 functional API: `change(doc, cb)` retorna novo doc; Proxy rejeita `undefined`
 - `Function('return import("./path.js")')()` evita TypeScript module resolution errors para generated files
@@ -85,7 +97,18 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - Partition proporcional: dar 1 layer mínima a cada peer e distribuir remainder via fractional part sorting evita starvation de peers fracos
 - Segment Means: compressão eficiente para ativações entre stages de pipeline (ratio = segmentSize, overhead mínimo)
 - Rust `#![allow(dead_code)]` necessário em crate WASM porque wasm-bindgen exports não são visíveis ao compilador Rust
+- Speculative Decoding: rejection sampling com base na razão p_target/p_draft; ajuste adaptativo do speculationLen baseado na acceptance rate
+- Inference pipeline: round-robin distribution de layers entre hosts; memory estimation para KV cache + weights + activations
 - Evitar `tauri build` dentro de `build.cjs` — `beforeBuildCommand` cria loop recursivo se `build` script chama `tauri build`
+- Agentic Mesh: Semantic Routing (HNSW + embeddings) > keyword matching; Planner como agente > módulo fixo; topologia híbrida como default (AdaptOrch)
+- Frações imutáveis com checksum garantem integridade entre agentes na mesh P2P
+- Modelo Symphony valida: decentralized multi-agent com <5% overhead, robusto a 20% falhas
+- **SemanticRouter**: peso combinado = 0.5*semantic + 0.3*toolMatch − 0.1*cost − 0.1*latency penaliza agentes lentos/caros
+- **HnswIndex TS**: abordagem simplificada com randomLevel e vizinhança limitada a 16; layers múltiplas para aproximar busca hierárquica
+- **AgentMeshManager**: health monitoring via missedHeartbeats (3 misses→offline); heartbeatInterval 5s, timeout 15s
+- **embedText hash-based**: determinístico para texto idêntico (cosine=1), pseudo-aleatório para textos diferentes. Não captura semântica — placeholder até integration com SBERT
+- **Testes com hash embeddings**: só comparar identical string (sim=1) vs different string (sim<1); não assumir similaridade semântica real
+- **Event system**: padrão onEvent/emit com Set<Callback> e cleanup function; tolerante a handlers com erro (try-catch no loop)
 
 ## Tarefas Pendentes
 - ~~**WebTransport funcional entre 2 peers reais** — CONCLUÍDO! `pnpm example:echo` funcional~~
@@ -94,11 +117,18 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - ~~**Loop recursivo desktop-node-agent** — CONCLUÍDO~~
 - ~~**Pipeline Parallelism** — CONCLUÍDO (9 testes)~~
 - ~~**Segment Means compression** — CONCLUÍDO (6 testes)~~
-- **Distributed Speculative Decoding** — Sprint 2 (mobile draft, PC verify)
-- **Sharded inference pipeline + activation checkpoints** — core-wasm-engine
+- ~~**Distributed Speculative Decoding** — CONCLUÍDO! 11 testes~~
+- ~~**Sharded inference pipeline** — CONCLUÍDO! 11 testes~~
+- ~~**Activation checkpoints** — CONCLUÍDO!~~
+- ~~**Thermal Management** — CONCLUÍDO! 30 testes (20 ThermalManager + 10 DynamicShifter)~~
+- ~~**Sprint 3: Mobile App + Thermal** — CONCLUÍDO (app scaffolds + thermal routing)~~
+- ~~**Sprint 4a: Semantic Router** — CONCLUÍDO! 30 testes (5 HnswIndex + 17 SemanticRouter + 8 AgentMeshManager)~~
 - **ExecuTorch Device Test** — precisa de dispositivo físico (Android/iOS com ExecuTorch)
 - **Cross-Platform CI verification** — verificar status em github.com/msrovani/SKYNET/actions
 - **WASM em Safari/Firefox** — testes cross-browser pendentes
+- **Sprint 4b: Agentic Mesh** — DAG Planner + Fraction Aggregator + TopologyRouter
+- **Sprint 4c: Agentic Mesh** — Agent Runtime (Rust) + AgentHost (Tauri)
+- **Sprint 4d: Agentic Mesh** — UI Agent Query + x402 payments + Release
 
 ## Comandos
 - `pnpm install` — instalar deps
@@ -108,10 +138,13 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - `pnpm exec turbo build` — build via Turborepo
 - `pnpm --filter @skynet/p2p-mesh-network example:echo` — WebTransport echo demo
 - `pnpm --filter @skynet/p2p-mesh-network example:setup` — gerar certificados
+- `pnpm --filter @skynet/app-ui-orchestrator build:web` — build web app (Next.js)
 
 ## Referências
 - KNOWLEDGE_BASE.md — documentação completa do projeto
 - SPRINT_0_PLANNING.md — planeamento arquitetural + 10 secções + 15 ADRs
+- SPRINT_AGENTIC_PLANNING.md — planeamento da camada de agentes distribuídos + 10 papers + 4 ADRs
+- AI_USAGE_MODES.md — 4 modos de uso de IA (Relâmpago/Profundo/Agente/Silêncio)
 - ANALYSIS_PC_NODES.md — análise PC como nós
 - TODO.md — task list detalhada
 

@@ -4,8 +4,8 @@
 
 [![CI](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml/badge.svg)](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-52%20passing-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/version-0.4.0-green.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-124%20passing-brightgreen.svg)]()
 
 ---
 
@@ -27,6 +27,265 @@ SKYNET é uma **DePIN super app** que orquestra dispositivos heterogéneos numa 
 | **L1** | PCs, Consolas | 7-13B params, verificação |
 | **L2** | Workstations, Smart TVs | 13-70B params, sharding |
 | **L3** | Datacenters (parceiros) | 70B+, scheduling global |
+
+## Ciclo Completo: Do Pedido à Resposta
+
+Segue o rasto de um pedido de inferência desde que o utilizador toca no ecrã até ao momento em que vê a resposta — e como cada pacote do SKYNET contribui.
+
+```
+   ┌──────────────────────────────────────────────────────────────────┐
+   │                    CICLO DE INFERÊNCIA DISTRIBUÍDA               │
+   │                                                                  │
+   │  ① Pedido      ② Descoberta    ③ Roteamento     ④ Pipeline     │
+   │  ┌────────┐    ┌───────────┐   ┌───────────┐   ┌────────────┐   │
+   │  │ App UI │───▶│ Orchestr. │──▶│ Thermal   │──▶│ Pipeline   │   │
+   │  │ (L0/L1)│    │ Descobre  │   │ Router    │   │ Manager    │   │
+   │  └────────┘    │ peers     │   │ (quem faz │   │ (distribui │   │
+   │                └───────────┘   │ o quê)    │   │ layers)    │   │
+   │                                └───────────┘   └─────┬──────┘   │
+   │                                                      │          │
+   │  ┌───────────────────────────────────────────────────┼──────────┐│
+   │  │                MALHA P2P (WebTransport + QUIC)    │          ││
+   │  │                                                   ▼          ││
+   │  │  ⑤ Speculative Decoding (6 passos por token)                ││
+   │  │                                                   │          ││
+   │  │     ┌──────────┐    ┌──────────┐    ┌──────────┐ │          ││
+   │  │     │ Phone A  │    │ Phone B  │    │  PC C    │ │          ││
+   │  │     │ (L0)     │    │ (L0)     │    │ (L1)     │ │          ││
+   │  │     │ draft 1  │    │ draft 2  │    │ verify   │ │          ││
+   │  │     │ token 1-5│    │ token 6-9│    │ tokens   │ │          ││
+   │  │     └────┬─────┘    └────┬─────┘    └────┬─────┘ │          ││
+   │  │          │               │               │        │          ││
+   │  │          └───────┬───────┘               │        │          ││
+   │  │                  ▼                       │        │          ││
+   │  │          ┌──────────────┐                │        │          ││
+   │  │          │  Token       │◄───────────────┘        │          ││
+   │  │          │  Aggregator  │                         │          ││
+   │  │          │  (aceita/    │                         │          ││
+   │  │          │   rejeita)   │                         │          ││
+   │  │          └──────┬───────┘                         │          ││
+   │  │                 │                                 │          ││
+   │  │  ⑥ Se aceite: token → próximo ciclo               │          ││
+   │  │  ⑦ Se reject: resample → corrige                  │          ││
+   │  └───────────────────────────────────────────────────┼──────────┘│
+   │                                                      │          │
+   │  ⑧ Resposta    ⑨ Pagamento     ⑩ Evolução          │          │
+   │  ┌────────┐    ┌───────────┐   ┌────────────┐       │          │
+   │  │ App UI │◀───│ x402 micro│   │ Genome     │◄──────┘          │
+   │  │ stream │    │ tx (Sol.) │   │ evolve     │                  │
+   │  │ tokens │    │ ~$0/sessão│   │ parâmetros │                  │
+   │  └────────┘    └───────────┘   └────────────┘                  │
+   └──────────────────────────────────────────────────────────────────┘
+```
+
+### Fase ① — Pedido (Frontend)
+
+O utilizador interage com a **app SKYNET** (React Native no telemóvel ou Next.js PWA no browser). O prompt é um JSON com o modelo alvo (ex: `"llama-3.2-3b-int4"`), os tokens de input e parâmetros de inferência (temperature, max_tokens).
+
+```
+app-ui-orchestrator/  ← envia pedido
+    → p2p-mesh-network/  ← descobre & coordena
+```
+
+### Fase ② — Descoberta de Nós (Mesh Discovery)
+
+O **PeerDiscovery** no `p2p-mesh-network` consulta a malha P2P para encontrar nós disponíveis com capacidade para o modelo pedido:
+
+1. **L0** (telemóveis) — anunciam-se via WebTransport + WebRTC fallback
+2. **L1** (PCs) — correm `desktop-node-agent` com Tauri, expõem GPU (CUDA/Metal) e capacidade
+3. **L2** (workstations, Smart TVs) — tal como L1 mas com mais VRAM
+4. PCs configuram-se como **servidores TURN/STUN descentralizados** para relays
+
+Cada nó publica uma `NodeCapability` com:
+- `computeScore` — TFLOPS relativos
+- `vramGb`, `bandwidthGbps`, `latencyMs`
+- `thermalHeadroom` — quanto pode aquecer
+- `uptimeHours` — fiabilidade
+
+O **RoleElection** classifica cada nó como `drafter` (L0, gera candidatos) ou `verifier` (L1+, valida).
+
+### Fase ③ — Roteamento Térmico e Circadiano
+
+O **Adaptive Scheduler** no `core-wasm-engine` (módulo `thermal.rs`) decide **quem faz o quê** com base em:
+
+| Fator | Peso | Descrição |
+|-------|------|-----------|
+| Compute score | 0.30 | TFLOPS relativos do nó |
+| VRAM livre | 0.25 | Cabe o modelo? |
+| Thermal headroom | 0.20 | Distância do throttling |
+| Bandwidth | 0.15 | Velocidade de rede |
+| Circadian phase | 0.10 | Noite no fuso horário do nó = mais peso |
+
+O **Circadian-Aware Scheduling** (ADR-14) dá prioridade a nós onde é noite — aproveita dispositivos ociosos enquanto os donos dormem. À medida que o terminador terrestre se move, as cargas deslocam-se.
+
+### Fase ④ — Pipeline Assignment (Distribuição de Layers)
+
+O **PipelineManager** no `p2p-mesh-network` pega na arquitectura do transformer (ex: 32 layers, Llama 3.2 3B) e distribui as layers pelos nós selecionados:
+
+```
+Modelo: 32 layers, 2048 hidden_dim
+Nós:    phone-1 (fraco), phone-2 (fraco), pc-1 (forte)
+
+Partição proporcional:
+  phone-1: layers 0-1   (2 layers, draft)
+  phone-2: layers 2-3   (2 layers, draft)
+  pc-1:    layers 4-31  (28 layers, verify)
+```
+
+- **Cada nó recebe um shard vertical** do modelo (fatia de layers contíguas)
+- O algoritmo garante que **nenhum nó morre de fome**: cada um recebe pelo menos 1 layer
+- Se um nó falha, o pipeline é **reconfigurado automaticamente** (testado em 9 testes)
+- Para modelos muito grandes, as layers são também **sharded horizontalmente** (column-wise) entre múltiplos PCs
+
+### Fase ⑤ — Speculative Decoding Distribuído (6 Sub-passos por Token)
+
+Este é o coração. Para **cada token** gerado, o sistema executa 6 sub-passos:
+
+```
+Passo 5a — Draft: L0 (phone-1) gera N=5 tokens candidatos
+    Usa modelo pequeno (draft) — corre em ExecuTorch com backend CPU/GPU pequeno
+    Saída: [token_17, token_42, token_88, token_3, token_155]
+    + as probabilidades de cada token (p_draft)
+
+Passo 5b — Compressão: SegmentMeans comprime as ativações
+    As ativações entre layers são grandes (hidden_dim * 4 bytes)
+    SegmentMeans divide em segmentos de tamanho S e substitui cada segmento pela média
+    Ratio de compressão = S (ex: S=16 → 16x menos dados)
+    Isso reduz largura de banda entre nós --- crucial em mobile
+
+Passo 5c — Verificação: L1 (pc-1) corre os 5 tokens em paralelo
+    PC corre o modelo grande (target) e obtém distribuições p_target para cada posição
+    Uma única forward pass do target processa todos os 5 tokens de uma vez
+    Isto é o que torna speculative decoding eficiente: 1 forward do target ≈ 5 tokens
+
+Passo 5d — Rejection Sampling: quantos aceitamos?
+    Para cada token i, calcula-se ratio = p_target(token_i) / p_draft(token_i)
+    Se random() < min(1, ratio * acceptance_threshold) → ACEITE
+    Senão → REJEITADO e resample da distribuição ajustada
+
+Passo 5e — Agregação: quantos tokens produzimos neste ciclo?
+    Exemplo: aceites [17, 42, 88]; rejeitado o 4º; resample token_201
+    Output deste ciclo: 4 tokens (em vez de 1)
+    Speedup = accepted_count / speculation_len
+
+Passo 5f — Feedback: o speculation_len adapta-se
+    Se acceptance_rate > 70% → aumenta speculation_len (mais agressivo)
+    Se acceptance_rate < 30% → reduz (mais conservador)
+    Isto maximiza tokens/segundo
+```
+
+#### Porquê isto é melhor que Pipeline Parallelism puro?
+
+| PP puro | Speculative Decoding Distribuído |
+|---------|----------------------------------|
+| Cada forward ociosa espera pelo anterior | Mobile gera draft sem esperar |
+| Pipeline bubbles em cada stage | Target processa N tokens em 1 forward |
+| Mobile não consegue participar | Mobile é essencial (draft rápido) |
+| Gargalo no nó mais lento | Carga distribuída por capacidade |
+
+### Fase ⑥ — KV Cache e Long Context
+
+O `inference.rs` no `core-wasm-engine` gere a **KV cache** para cada layer em cada nó:
+
+- Cache alocada no momento do planeamento (`createKvCache`)
+- Cresce incrementalmente com cada token aceite (`appendToKvCache`)
+- Para sequências longas (4k+), a cache é **sharded** entre nós
+- A cache persiste durante a sessão — não há recálculo
+
+### Fase ⑦ — Checkpoints de Ativação (Preemption Recovery)
+
+Se um nó falha ou atinge throttling térmico:
+
+```
+ActivationCheckpoint {
+    layer_idx: 5,
+    input_data: [0.1, -0.3, ...],   // input da layer
+    output_data: [0.5, 0.1, ...],    // output calculado
+    hidden_dim: 2048,
+    seq_pos: 42,
+}
+```
+
+- Checkpoints são guardados no **nó anterior + 1 backup aleatório**
+- Se o nó 5 falha, o pipeline reconfigura-se e recomeça do checkpoint
+- **Nenhum token perdido** — apenas o trabalho da layer falhada
+
+### Fase ⑧ — Stream de Resposta
+
+À medida que os tokens são verificados e aceites, são **streamed em tempo real** de volta ao frontend:
+
+```
+PC (verify) → Token Aggregator → Orchestrator → App UI
+                token a token          streaming HTTP/SSE
+```
+
+- **Latência: ~100-500ms** por ciclo de speculative decoding (5-10 tokens)
+- O utilizador vê os tokens a aparecer em tempo real — como ChatGPT
+- Se o nó verificador está longe, a latência sobe mas o throughput mantém-se
+
+### Fase ⑨ — Pagamento (x402 + State Channels)
+
+Cada sessão de inferência é paga via **Solana x402**:
+
+1. App solicita sessão → gera **State Channel** entre utilizador e mesh
+2. A cada N tokens, assina uma **micro-transacção off-chain**
+3. Saldo é liquidado na Solana quando o canal fecha (custo ≈ $0.001)
+4. **80% do pagamento** vai para os operadores dos nós que processaram
+5. **20% para a rede** (desenvolvimento, operação, staking)
+
+### Fase ⑩ — Evolução Genética (Self-Healing)
+
+Enquanto corre, o sistema recolhe telemetria:
+
+| Métrica | Descrição |
+|---------|-----------|
+| Acceptance rate | Eficácia do draft |
+| Latência por ciclo | Performance da rede |
+| Thermal throttle | Stress térmico |
+| Earnings/hr | Rentabilidade |
+| Success rate | Fiabilidade |
+
+Esta telemetria alimenta o **EvolutionEngine** (algoritmo genético, pop=20):
+
+- **Crossover (70%)**: combina parâmetros de 2 pais
+- **Mutação (15%)**: pequenas variações aleatórias
+- **Novos parâmetros**: speculation_len, threshold, batch_size, segment_size, pesos do scheduler
+
+O genome mais apto sobrevive → **parâmetros propagam-se pela mesh via CRDT**.
+
+---
+
+### Diagrama de Sequência Simplificado
+
+```
+App              Orchestrator       Phone (L0)        PC (L1)
+ │                     │                │               │
+ │── prompt ──────────▶│                │               │
+ │                     │── discover ───▶│               │
+ │                     │◀─ capability ──│               │
+ │                     │── discover ──────────────────▶│
+ │                     │◀─ capability ─────────────────│
+ │                     │ (thermal routing)             │
+ │                     │── assign layers ─────────────▶│
+ │                     │── assign layers ──▶│          │
+ │                     │                   │          │
+ │                     │─── draft N ──────▶│          │
+ │                     │                   │── tokens │
+ │                     │── activations ──────────────▶│
+ │                     │ (segment means)   │          │
+ │                     │                   │── verify │
+ │                     │◀─ accept/reject ─────────────│
+ │── token stream ◀────│                   │          │
+ │                     │                   │          │
+ │                     │ (loop até eos)    │          │
+ │                     │                   │          │
+ │── close session ───▶│                   │          │
+ │                     │── settle payment ─│─────────▶│
+ │                     │ (x402 channel)    │          │
+ │◀─ done ◀────────────│                   │          │
+```
+
+---
 
 ## Arquitetura
 
@@ -82,11 +341,15 @@ SKYNET é uma **DePIN super app** que orquestra dispositivos heterogéneos numa 
 ```
 Sprint 0 ████████████████████ 100%  Planeamento, ADRs
 Sprint 1 ████████████████████ 100%  Fundação (WASM, WebTransport, ExecuTorch, 8 pacotes)
-Sprint 2 ████████████████░░░░  80%  Mesh Local L1 (Pipeline, Segment Means ✓ | DSD pendente)
-Sprint 3 ░░░░░░░░░░░░░░░░░░░░   0%  Mobile App + Thermal
-Sprint 4 ░░░░░░░░░░░░░░░░░░░░   0%  Segurança + Blockchain
-Sprint 5 ░░░░░░░░░░░░░░░░░░░░   0%  Federated Learning
-Sprint 6 ░░░░░░░░░░░░░░░░░░░░   0%  Integração + Beta
+Sprint 2 ████████████████████ 100%  Mesh Local L1 (DSD, Inference pipeline, Checkpoints)
+Sprint 3 ████████████████████ 100%  Mobile App + Thermal
+Sprint 4a ████████████████████ 100%  Agentic Mesh: Semantic Router + HNSW
+Sprint 4b ░░░░░░░░░░░░░░░░░░░  0%  Agentic Mesh: Planner + Aggregator
+Sprint 4c ░░░░░░░░░░░░░░░░░░░  0%  Agentic Mesh: Agent Runtime + Desktop
+Sprint 4d ░░░░░░░░░░░░░░░░░░░  0%  Agentic Mesh: UI + Payments + Release
+Sprint 5 ░░░░░░░░░░░░░░░░░░░░   0%  Segurança + Blockchain
+Sprint 6 ░░░░░░░░░░░░░░░░░░░░   0%  Federated Learning
+Sprint 7 ░░░░░░░░░░░░░░░░░░░░   0%  Integração + Beta
 ```
 
 ### O que funciona HOJE (podes executar)
@@ -94,24 +357,32 @@ Sprint 6 ░░░░░░░░░░░░░░░░░░░░   0%  Inte
 | Componente | Estado |
 |-----------|--------|
 | `pnpm install` + `pnpm build` | ✅ 8/8 packages |
-| `pnpm test` | ✅ 52 testes passam |
+| `pnpm test` | ✅ 124 testes passam (24 core-wasm + 100 p2p) |
 | WebTransport echo demo (`pnpm example:echo`) | ✅ QUIC ~170ms, roundtrip ~15ms |
 | Pipeline Parallelism (código + testes) | ✅ Layer partition por capacidade |
 | Segment Means compression (código + testes) | ✅ Compressão lossy de ativações |
-| WASM core (Rust → WebAssembly) | ✅ 153KB otimizado |
+| Distributed Speculative Decoding (código + testes) | ✅ 11 testes (draft, verify, rejection) |
+| Sharded Inference Pipeline (código + testes) | ✅ 11 testes (plan, memory, KV cache) |
+| Activation Checkpoints (código + testes) | ✅ Preemption/recovery |
+| Thermal Management (código + testes) | ✅ 30 testes (zone/trend/cooldown/shift) |
+| Semantic Router (código + testes) | ✅ 22 testes (HNSW index + semantic matching) |
+| Agent Mesh Manager (código + testes) | ✅ 8 testes (registry, heartbeats, health) |
+| WASM core (Rust → WebAssembly) | ✅ 168KB otimizado |
+| App UI (React Native + Next.js PWA) | ✅ Scaffolds com 3 modos + monetização |
 
 ### O que NÃO funciona ainda (próximas sprints)
 
 | Funcionalidade | Previsão |
 |---------------|----------|
-| **Inferência real num PC** | Sprint 3-4 |
-| **App mobile/desktop funcional** | Sprint 3 |
-| **Malha P2P entre múltiplos PCs** | Sprint 2-3 |
-| **Distributed Speculative Decoding** | Sprint 2 (pendente) |
-| **Blockchain (x402, State Channels)** | Sprint 4 |
-| **Federated Learning em dispositivos** | Sprint 5 |
-| **TEE Remote Attestation** | Sprint 4 |
-| **Beta público instalável** | Sprint 6 (target) |
+| **Inferência real num PC** | Sprint 4c-5 |
+| **DAG Planner (decomposição de tarefas)** | Sprint 4b |
+| **Fraction Aggregator (síntese multi-agente)** | Sprint 4b |
+| **Agent Runtime (Rust → WASM)** | Sprint 4c |
+| **Agent UI + x402 payments** | Sprint 4d |
+| **Blockchain (x402, State Channels)** | Sprint 5 |
+| **Federated Learning em dispositivos** | Sprint 6 |
+| **TEE Remote Attestation** | Sprint 5 |
+| **Beta público instalável** | Sprint 7 (target) |
 
 > **⚠️ SKYNET está em desenvolvimento ativo (Pre-Alpha).** Código funcional, testado e buildável — mas não instalável por utilizadores finais. Se és developer ou early adopter, contribui ou acompanha em [github.com/msrovani/SKYNET](https://github.com/msrovani/SKYNET).
 

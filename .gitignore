@@ -11,3 +11,6 @@ target/
 *.log
 .DS_Store
 Thumbs.db
+.next/
+out/
+next-env.d.ts

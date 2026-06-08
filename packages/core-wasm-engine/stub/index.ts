@@ -391,3 +391,149 @@ export function verifyTensorShard(shard: TensorShard): boolean {
   }
   return checksum === shard.metadata.checksum;
 }
+
+// -- Inference / Sharded Pipeline --
+
+export interface TransformerConfig {
+  numLayers: number;
+  hiddenDim: number;
+  numHeads: number;
+  headDim: number;
+  ffnHiddenDim: number;
+  vocabSize: number;
+  maxSeqLen: number;
+}
+
+export interface PipelineLayerAssignment {
+  layerIdx: number;
+  hostId: string;
+  shardIdx: number;
+  totalShards: number;
+}
+
+export interface PipelinePlan {
+  config: TransformerConfig;
+  layerAssignments: PipelineLayerAssignment[];
+  numHosts: number;
+}
+
+export interface KVCacheEntry {
+  layerIdx: number;
+  keys: Float32Array;
+  values: Float32Array;
+  seqLen: number;
+  numHeads: number;
+  headDim: number;
+}
+
+export interface InferenceMemoryEstimate {
+  kvCacheBytes: number;
+  activationBytes: number;
+  weightBytes: number;
+  totalBytes: number;
+  fitsInVramGb: number;
+}
+
+export interface ActivationCheckpoint {
+  layerIdx: number;
+  inputData: Float32Array;
+  outputData: Float32Array;
+  hiddenDim: number;
+  seqPos: number;
+}
+
+export function createTransformerConfig(
+  numLayers: number, hiddenDim: number, numHeads: number,
+  headDim: number, ffnHiddenDim: number, vocabSize: number, maxSeqLen: number,
+): TransformerConfig {
+  if (wasmModule) {
+    return wasmModule.create_transformer_config(numLayers, hiddenDim, numHeads, headDim, ffnHiddenDim, vocabSize, maxSeqLen);
+  }
+  return { numLayers, hiddenDim, numHeads, headDim, ffnHiddenDim, vocabSize, maxSeqLen };
+}
+
+export function buildPipelinePlan(config: TransformerConfig, hostIds: string[]): PipelinePlan {
+  if (wasmModule) {
+    return wasmModule.build_pipeline_plan(config, hostIds);
+  }
+  const numHosts = hostIds.length;
+  const layerAssignments: PipelineLayerAssignment[] = [];
+  for (let i = 0; i < config.numLayers; i++) {
+    layerAssignments.push({ layerIdx: i, hostId: hostIds[i % numHosts], shardIdx: 0, totalShards: 1 });
+  }
+  return { config, layerAssignments, numHosts };
+}
+
+export function buildShardedPipelinePlan(config: TransformerConfig, hostIds: string[], shardsPerLayer: number): PipelinePlan {
+  if (wasmModule) {
+    return wasmModule.build_sharded_pipeline_plan(config, hostIds, shardsPerLayer);
+  }
+  const numHosts = hostIds.length;
+  const layerAssignments: PipelineLayerAssignment[] = [];
+  for (let i = 0; i < config.numLayers; i++) {
+    for (let s = 0; s < shardsPerLayer; s++) {
+      layerAssignments.push({ layerIdx: i, hostId: hostIds[(i * shardsPerLayer + s) % numHosts], shardIdx: s, totalShards: shardsPerLayer });
+    }
+  }
+  return { config, layerAssignments, numHosts };
+}
+
+export function estimateInferenceMemory(config: TransformerConfig): InferenceMemoryEstimate {
+  if (wasmModule) {
+    return wasmModule.estimate_inference_memory(config);
+  }
+  const kvPerLayer = 2 * config.maxSeqLen * config.numHeads * config.headDim * 4;
+  const kvCacheTotal = kvPerLayer * config.numLayers;
+  const activationBytes = config.hiddenDim * 4 * 4;
+  const weightParams = config.hiddenDim * (4 * config.hiddenDim + 2 * config.ffnHiddenDim + 2 * config.headDim * config.numHeads) * config.numLayers;
+  const weightBytes = weightParams * 4;
+  const total = kvCacheTotal + activationBytes + weightBytes;
+  return { kvCacheBytes: kvCacheTotal, activationBytes, weightBytes, totalBytes: total, fitsInVramGb: total / (1024 * 1024 * 1024) };
+}
+
+export function estimatePeerMemory(config: TransformerConfig, plan: PipelinePlan, hostId: string): InferenceMemoryEstimate {
+  if (wasmModule) {
+    return wasmModule.estimate_peer_memory(config, plan, hostId);
+  }
+  const layersOnHost = plan.layerAssignments.filter(a => a.hostId === hostId).length;
+  const layersHost = Math.max(layersOnHost, 1);
+  const kvPerLayer = 2 * config.maxSeqLen * config.numHeads * config.headDim * 4;
+  const kvCacheHost = kvPerLayer * layersHost;
+  const paramPerLayer = config.hiddenDim * (4 * config.hiddenDim + 2 * config.ffnHiddenDim + 2 * config.headDim * config.numHeads);
+  const shardsPerLayer = plan.layerAssignments.length > 0 ? plan.layerAssignments[0].totalShards : 1;
+  const weightHost = paramPerLayer * layersHost / shardsPerLayer;
+  const activation = config.hiddenDim * 4 * 4;
+  const total = kvCacheHost + activation + weightHost;
+  return { kvCacheBytes: kvCacheHost, activationBytes: activation, weightBytes: weightHost, totalBytes: total, fitsInVramGb: total / (1024 * 1024 * 1024) };
+}
+
+export function createKvCache(config: TransformerConfig): KVCacheEntry[] {
+  if (wasmModule) {
+    return wasmModule.create_kv_cache(config);
+  }
+  const cache: KVCacheEntry[] = [];
+  for (let i = 0; i < config.numLayers; i++) {
+    cache.push({
+      layerIdx: i,
+      keys: new Float32Array(config.maxSeqLen * config.numHeads * config.headDim),
+      values: new Float32Array(config.maxSeqLen * config.numHeads * config.headDim),
+      seqLen: 0,
+      numHeads: config.numHeads,
+      headDim: config.headDim,
+    });
+  }
+  return cache;
+}
+
+export function inferenceCheckpointForward(
+  input: Float32Array, weights: Float32Array, hiddenDim: number, layerIdx: number, pos: number,
+): ActivationCheckpoint {
+  if (wasmModule) {
+    return wasmModule.inference_checkpoint_forward(input, weights, hiddenDim, layerIdx, pos);
+  }
+  const output = new Float32Array(input.length);
+  for (let i = 0; i < Math.min(input.length, weights.length); i++) {
+    output[i] = input[i] * 0.5 + weights[i] * 0.5;
+  }
+  return { layerIdx, inputData: input, outputData: output, hiddenDim, seqPos: pos };
+}

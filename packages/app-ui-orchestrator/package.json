@@ -16,10 +16,15 @@
     "@skynet/inference-runtime": "workspace:*",
     "@skynet/blockchain-client": "workspace:*",
     "@skynet/fl-training-client": "workspace:*",
-    "@skynet/tee-attestation-layer": "workspace:*"
+    "@skynet/tee-attestation-layer": "workspace:*",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
-    "eslint": "^8.57.0"
+    "eslint": "^8.57.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
   }
 }

@@ -13,6 +13,31 @@ pub struct ThermalState {
     pub params: InferenceParams,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum ThermalZone {
+    Safe,
+    Warm,
+    Hot,
+    Critical,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum DeviceClass {
+    Mobile,
+    Laptop,
+    Desktop,
+    Tv,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AdaptiveParams {
+    pub threads: u32,
+    pub batch_size: u32,
+    pub model_variant: String,
+    pub zone: ThermalZone,
+    pub trend: String,
+}
+
 pub fn get_headroom() -> f64 {
     js_sys::Reflect::get(
         &js_sys::global(),
@@ -55,4 +80,60 @@ pub fn should_throttle(headroom: f64) -> bool {
 pub fn estimate_safe_workload(headroom: f64, max_tokens: usize) -> usize {
     let ratio = (headroom / 15.0).clamp(0.1, 1.0);
     (max_tokens as f64 * ratio) as usize
+}
+
+pub fn compute_zone(headroom: f64, device_class: &DeviceClass) -> ThermalZone {
+    let (safe, warm, hot) = match device_class {
+        DeviceClass::Mobile => (12.0, 8.0, 5.0),
+        DeviceClass::Laptop => (14.0, 10.0, 6.0),
+        DeviceClass::Desktop => (16.0, 12.0, 8.0),
+        DeviceClass::Tv => (14.0, 10.0, 6.0),
+    };
+    if headroom >= safe { ThermalZone::Safe }
+    else if headroom >= warm { ThermalZone::Warm }
+    else if headroom >= hot { ThermalZone::Hot }
+    else { ThermalZone::Critical }
+}
+
+pub fn compute_adaptive_params(headroom: f64, device_class: &DeviceClass, trend: &str) -> AdaptiveParams {
+    let zone = compute_zone(headroom, device_class);
+    let is_heating = trend == "heating";
+
+    let (base_threads, base_batch) = match device_class {
+        DeviceClass::Desktop => (8, 512),
+        DeviceClass::Laptop => (4, 256),
+        DeviceClass::Mobile => (4, 128),
+        DeviceClass::Tv => (4, 256),
+    };
+
+    let (t_scale, b_scale) = match zone {
+        ThermalZone::Safe => (1.0, 1.0),
+        ThermalZone::Warm => (0.85, 0.75),
+        ThermalZone::Hot => (0.65, 0.5),
+        ThermalZone::Critical => (0.5, 0.25),
+    };
+
+    let heating_penalty = if is_heating && matches!(zone, ThermalZone::Warm | ThermalZone::Hot) {
+        0.7
+    } else {
+        1.0
+    };
+
+    let threads = ((base_threads as f64) * t_scale * heating_penalty).max(1.0).round() as u32;
+    let batch_size = ((base_batch as f64) * b_scale * heating_penalty).max(1.0).round() as u32;
+
+    let model_variant = match zone {
+        ThermalZone::Safe => "full",
+        ThermalZone::Warm => if headroom > 9.0 { "full" } else { "reduced" },
+        ThermalZone::Hot => "reduced",
+        ThermalZone::Critical => "minimal",
+    };
+
+    AdaptiveParams {
+        threads,
+        batch_size,
+        model_variant: model_variant.to_string(),
+        zone,
+        trend: trend.to_string(),
+    }
 }

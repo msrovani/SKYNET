@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.4.0] — 2026-06-07 — Sprint 4a: Agentic Mesh — Semantic Router
+
+### Added
+- **VCapabilityVector** (`capability.ts`): Versioned Capability Vectors com embeddings semânticos. `embedText()` gera vector normalizado hash-based, `cosineSimilarity()` para comparação.
+- **HnswIndex** (`semantic-router.ts`): Índice ANN hierárquico O(log N) com randomLevel, layers múltiplas, vizinhança limitada a 16.
+- **SemanticRouter** (`semantic-router.ts`): Registo/remoção de agentes, matching semântico + tool score, top-K retrieval, fallback para low-score, sistema de eventos (agent_registered, route_found, route_failed, fallback_used). Score combinado = 0.5*semantic + 0.3*tools − 0.1*cost − 0.1*latency.
+- **AgentMeshManager** (`agent-mesh.ts`): Registo local/remoto de agentes, heartbeats, health monitoring (3 misses → offline), eventos de mesh (agent_online/offline/degraded, mesh_connected/disconnected, task_assigned).
+- **30 testes** (5 HnswIndex + 17 SemanticRouter + 8 AgentMeshManager).
+- **100 testes p2p-mesh-network** no total.
+
+### Infrastructure
+- NodeCapability estendida com VCapabilityVector, embedText, cosineSimilarity.
+- Event system padrão: onEvent/emit com Set<Callback> e cleanup function.
+
+### Tests
+- **124 total** (24 core-wasm-engine + 100 p2p-mesh-network).
+- 14/14 tasks pass via `pnpm test`.
+
+---
+
 ## [0.2.0] — 2026-06-07 — Sprint 2: Mesh Local L1
 
 ### Added

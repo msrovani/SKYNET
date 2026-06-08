@@ -2,200 +2,118 @@
 
 ## Sprint 0: Planejamento ✅
 
-- [x] Pesquisar WebTransport vs WebRTC (Baseline 2026)
-- [x] Pesquisar WebGPU cross-platform support (Baseline 2026)
-- [x] Pesquisar ExecuTorch performance benchmarks (1.0 GA)
-- [x] Pesquisar ARM CCA confidential computing
-- [x] Pesquisar Federated Learning algorithms (FedYogi, FedAdamW, Q-LocalAdam, FEDADAVR)
-- [x] Pesquisar Thermal throttling mitigation strategies
-- [x] Pesquisar Pipeline vs Tensor Parallelism para mobile
-- [x] Pesquisar Solana/Base x402 protocol para microtransações
+- [x] Pesquisar WebTransport vs WebRTC, WebGPU, ExecuTorch, ARM CCA, FedYogi, thermal, pipeline vs tensor, x402
 - [x] Sintetizar research em SPRINT_0_PLANNING.md
-- [x] Definir arquitetura 7 pacotes
-- [x] Definir plano de 6 sprints
+- [x] Definir arquitetura 8 pacotes, 6 sprints
 
-## Sprint 1: Fundação ✅ (Semanas 1-4)
+## Sprint 1: Fundação ✅
 
-### 1.1 Monorepo Setup
-- [x] Inicializar Turborepo com pnpm
-- [x] Configurar `pnpm-workspace.yaml`, `turbo.json`, `tsconfig.base.json`
-- [x] Configurar CI (GitHub Actions)
+- [x] Monorepo (Turborepo + pnpm), CI (GitHub Actions matrix)
+- [x] `core-wasm-engine`: Rust→WASM (tensor sharding, INT4, thermal, capability, evolution, KG, context prune, inference)
+- [x] `p2p-mesh-network`: TransportManager, WebRTC fallback, Automerge CRDT, failover, discovery, role election, instinct, capability, pipeline, segment-means, speculative-decoding, thermal
+- [x] `inference-runtime`: ExecuTorch 1.2 API, model loader, KNOWN_MODELS
+- [x] `desktop-node-agent`: Tauri v2 (GPU, power, MOSS), stub build
+- [x] WebTransport Hello World (`@moq/web-transport`, QUIC ~170ms)
+- [x] WASM: 168KB, JS glue 34KB, types 8KB
+- [x] 8/8 packages build, CI matrix ubuntu/macos/windows
 
-### 1.2 core-wasm-engine
-- [x] `Cargo.toml` com wasm-bindgen, wgpu, web-sys
-- [x] `lib.rs`: WASM bindings (25 funções exportadas)
-- [x] `webgpu.rs`: Contexto WebGPU (stubbed, web-sys lacks bindings)
-- [x] `tensor.rs`: Sharding row/col, quantização INT4, reconstruct, verify
-- [x] `thermal.rs`: Monitor térmico (getThermalHeadroom)
-- [x] `capability.rs`: NodeCapability, score/tier computation
-- [x] `evolution.rs`: Genetic algorithm (pop 20, crossover 70%, mutation 15%)
-- [x] `autonomous.rs`: AutonomousOrchestrator, experiment tracking
-- [x] `knowledge_graph.rs`: Directed graph + thermal cascade analysis
-- [x] `context_prune.rs`: 95% compression for edge devices
-- [x] `stub/index.ts`: TS stub replicando ALL WASM bindings + lazy WASM load
-- [x] `stub/__tests__/sharding.test.ts`: 13 unit tests (vitest 1.6.1)
-- [x] `build.cjs`: Compila via temp dir ASCII → wasm-bindgen → copy → tsc
-- [x] WASM compila e otimiza: 502KB → 153KB (wasm-bindgen 0.2.122)
+## Sprint 2: Mesh Local — L1 ✅
 
-### 1.3 inference-runtime
-- [x] `executorch.ts`: Binding para ExecuTorch 1.2 runtime (5 backends, tensor types, API completa)
-- [x] `model-loader.ts`: Download streaming, progress callback, KNOWN_MODELS (Llama 3.2 1B/3B)
-- [x] `onnx-runtime.ts`: Fallback ONNX Runtime Web
-- [ ] Testes com Llama 3.2 1B INT4 em dispositivo real
+- [x] Pipeline Parallelism — layer partition proporcional, reconfiguração (9 testes)
+- [x] Segment Means — compressão lossy de ativações (6 testes)
+- [x] Distributed Speculative Decoding — draft/verify/rejection sampling, adaptive speculation (11 testes)
+- [x] Sharded Inference Pipeline — TransformerConfig, PipelinePlan, KV cache, memory (11 testes)
+- [x] Activation Checkpoints — snapshots preemption/recovery
+- [x] Agentic Mesh Planning — SPRINT_AGENTIC_PLANNING.md, 10 papers, 4 ADRs
 
-### 1.4 p2p-mesh-network
-- [x] `transport.ts`: TransportManager (WebTransport + Multipath QUIC + WebRTC fallback)
-- [x] `webrtc-fallback.ts`: WebRTC DataChannel
-- [x] `crdt-sync.ts`: Automerge v2 CRDT (functional API)
-- [x] `failover.ts`: Heartbeat + circuit breaker + recovery
-- [x] `discovery.ts`: Peer Discovery (mDNS, signalling)
-- [x] `instinct.ts`: Instinct Engine (cross-node pattern promotion)
-- [x] `autonomous.ts`: EvolvableParams mutation + ExperimentTracker
-- [x] `election.ts`: Role election for mesh coordination
-- [x] `capability.ts`: Node capability computation
-- [x] 24 testes de integração: TransportManager, WebRTCFallback, CrdtSync, FailoverManager, RoleElection, Capability, InstinctEngine, ExperimentTracker, PeerDiscovery
+## Sprint 3: Mobile App + Thermal ✅
 
-### 1.5 desktop-node-agent
-- [x] `lib.rs` + `main.rs`: Tauri v2 split
-- [x] `gpu_detect.rs`: Deteção GPU, backends
-- [x] `power_mgmt.rs`: Power profiles, idle detection
-- [x] `node_service.rs`: Foreground service
-- [x] `installer.rs`: Windows/Mac/Linux service installer
-- [x] `auto_updater.rs`: Auto-update
-- [x] `moss.rs`: MOSS circuit breaker + recovery
+- [x] **Thermal Management**: ThermalManager (zone/trend/cooldown, 20 testes) + DynamicShifter (model chain, 10 testes) + `thermal.rs` WASM exports
+- [x] **AI_USAGE_MODES.md** — 4 modos baseados em IA (Relâmpago/Profundo/Agente + monetização toggle)
+- [x] **App UI scaffold**: React Native (Expo) + Next.js PWA com 3 modos (⚡Relâmpago, 🔬Profundo, 🤖Agente) + 🌙 toggle monetização
+- [x] `useSkynet.ts` hook com submitInference mock para cada modo, telemetria simulada
+- [x] Web app (Next.js 15) build OK, static export, sem warnings
+- [x] Modo monetização = toggle global (chave on/off), não modo separado
 
-### 1.6 Outros Pacotes
-- [x] `blockchain-client`: Solana x402, Base fallback, microtx
-- [x] `tee-attestation-layer`: Remote Attestation, TEE bridge, Proof of Time
-- [x] `fl-training-client`: FedYogi, Q-LocalAdam, FEDADAVR, client selection
-- [x] `app-ui-orchestrator`: React Native + Next.js PWA (placeholder)
+## Sprint 4a: Agentic Mesh — Semantic Router ✅
 
-### 1.7 Milestone S1
-- [x] pnpm build 8/8 pacotes OK
-- [x] pnpm test 14/14 tasks successful (37 testes)
-- [x] WASM compila nativamente (502KB → 153KB otimizado)
-- [x] JS glue (30KB) + TypeScript types (6KB) gerados via wasm-bindgen
-- [x] WebTransport Hello World scripts criados (echo server + client com @moq/web-transport)
-- [x] WebTransport funcional entre 2 peers reais — QUIC connect ~170ms, echo roundtrip ~15ms
-- [x] inference-runtime com API ExecuTorch 1.2 completa
-- [x] Cross-Platform CI workflow (matrix ubuntu/macos/windows)
-- [ ] Inferência local funcional num dispositivo Android (precisa hardware)
+- [x] `capability.ts` extended: VCapabilityVector, embedText() hash→vector, cosineSimilarity()
+- [x] `semantic-router.ts`: HnswIndex (ANN O(log N)) + SemanticRouter (registo, matching semântico+tools, fallback, eventos)
+- [x] `agent-mesh.ts`: AgentMeshManager (registo local/remoto, heartbeats, health monitoring, eventos)
+- [x] 30 testes (5 HnswIndex + 17 SemanticRouter + 8 AgentMeshManager)
+- [x] Event system: onEvent/emit com Set<Callback>, cleanup function
 
-## Sprint 1.5: Integração ✅ (Concluído — excepto hardware-dependentes)
+## Sprint 4b: Agentic Mesh — Planner + Aggregator ✅
 
-### 1.5.1 WASM JS Glue ✅
-- [x] Download binary precompilado wasm-bindgen-cli 0.2.122 do GitHub
-- [x] Gerar JS bindings (30KB) + TypeScript types (6KB) + WASM otimizado (153KB, -69%)
-- [x] build.cjs: cargo build → wasm-bindgen → copy → tsc
-- [x] stub/index.ts: lazy WASM loading com fallback TS puro, 18 funções exportadas
+- [x] `planner.ts`: TaskPlanner — decompõe prompts em DAGs (4 templates: webdesign/content/image/analysis), critical path depth, layer grouping
+- [x] `topology-router.ts`: TopologyRouter — AdaptOrch (parallel/sequential/hierarchical/hybrid), metrics parallelismWidth/criticalPathDepth/coupling
+- [x] `fraction-aggregator.ts`: FractionAggregator — valida checksums, merge HTML+CSS→página, JSON→merge, texto→markdown, consistência CSS/HTML class overlap, refinamento multi-round
+- [x] 25 testes (8 planner + 5 topology + 10 aggregator + 2 checksum)
+- [x] 149 testes totais (24 core-wasm + 125 p2p, 7 test files)
 
-### 1.5.2 ExecuTorch Device Test ⏳ (precisa hardware)
-- [x] `executorch.ts` reescrito com API ExecuTorch 1.2 (5 backends, tensor types, loadFromBuffer)
-- [x] `model-loader.ts` com streaming, progress callback, KNOWN_MODELS
-- [x] `recommendBackend()`, `estimateMemory()`, `getAvailableBackends()` exportados
-- [ ] Integrar ExecuTorch Llama 3.2 1B INT4 num dispositivo real
-- [ ] Medir performance (tok/s, latência, memória)
+## Sprint 4c: Agentic Mesh — Runtime + Desktop ⏳
 
-### 1.5.3 WebTransport Hello World ✅✅✅
-- [x] 24 testes de integração p2p-mesh-network passando
-- [x] `@moq/web-transport` (napi-rs) instalado como WebTransport server + client
-- [x] scripts/echo-server.ts — servidor WebTransport echo (bidirectional streams)
-- [x] scripts/echo-client.ts — cliente WebTransport (conecta, envia, recebe echo)
-- [x] scripts/generate-cert.ts — geração de certificados com node-forge
-- [x] scripts/run-echo.ts — orchestrator server + client (fork + --import tsx/esm)
-- [x] Comandos: `pnpm example:setup`, `pnpm example:echo`
-- [x] Conexão QUIC 0-RTT em ~170ms, roundtrip echo ~15ms
-- [x] Promise.withResolvers polyfill para Node.js v20
-- [x] fork() com execArgv: ['--import', 'tsx/esm'] para Windows paths acentuados
+### 4c.1 Agent Runtime
+- [ ] `agent_runtime.rs` no core-wasm-engine: load → init → execute → return → unload
+- [ ] `AgentHost` no desktop-node-agent: spawn/stop agent runtimes, expõe tools locais
+- [ ] Adapter no inference-runtime para AgentModel (model + tools adapter)
+- [ ] 3 agent templates: webdesign, content-writer, image-optimizer
+- [ ] Testes: 15+ (runtime lifecycle, tool injection, streaming fractions)
 
-### 1.5.4 Cross-Platform ✅
-- [x] CI workflow expandido: matrix `[ubuntu, macos, windows]` para build-ts, build-wasm, test
-- [x] WASM build usa `actions-rust-lang/setup-rust-toolchain` + target wasm32
-- [x] wasm-bindgen-cli precompilado baixado do GitHub (evita MSVC)
-- [ ] Verificar build Linux/macOS CI (precisa push ao GitHub)
-- [ ] Testar WASM em Safari/Firefox (precisa browsers)
+### 4c.2 Milestone S4c
+- [ ] Agentes correm em nós reais (PCs L1)
+- [ ] Tools injetadas por template
 
-## Sprint 2: Mesh Local — L1 (Semanas 5-8)
+## Sprint 4d: Agentic Mesh — UI + Payments + Release ⏳
 
-### 2.1 p2p-mesh-network ✅
-- [x] Pipeline Parallelism: Particionamento de layers entre peers (9 testes)
-- [x] Segment Means compression para comunicação entre nós (6 testes)
-- [ ] Distributed Speculative Decoding (mobile draft, PC verify)
+### 4d.1 Frontend
+- [ ] Modo "Agent Query" no app-ui-orchestrator: input livre, stream de frações, preview
+- [ ] Agent payment via x402 no blockchain-client
+- [ ] Reputation tracking (on-chain ou CRDT)
 
-### 2.2 core-wasm-engine (continuação)
-- [ ] Sharded inference pipeline
-- [ ] Checkpoint de ativações (para preempção abrupta)
+### 4d.2 Release
+- [ ] Testes E2E: 10+
+- [ ] Bump v0.7.0 + tag + demo público
 
-### 2.3 Milestone S2
-- [ ] 2+ dispositivos fazem inferência fragmentada em mesh WiFi
+## Sprint 5: Segurança e Blockchain
 
-## Sprint 3: Mobile App + Thermal (Semanas 9-12)
-
-### 3.1 app-ui-orchestrator
-- [ ] React Native (Expo) com Foreground Service
-- [ ] 3 modos: Tático, Fazenda, Passivo
-- [ ] Next.js PWA para browser/Smart TV
-
-### 3.2 Thermal Management
-- [ ] Adaptive Parameter Scheduler (threads, batch size)
-- [ ] Dynamic Shifting (model switching)
-- [ ] PerformanceHintManager integration
-
-### 3.3 Milestone S3
-- [ ] App roda 30+ min com 77%+ retenção de throughput
-
-## Sprint 4: Segurança e Blockchain (Semanas 13-16)
-
-### 4.1 tee-attestation-layer
+### 5.1 tee-attestation-layer
 - [ ] `attestation.ts`: Remote Attestation (SGX simulation)
 - [ ] `tee-bridge.ts`: Abstração SGX/SEV/CCA
 - [ ] `proof-of-time.ts`: Proof of Inference Time measurement
 
-### 4.2 blockchain-client
+### 5.2 blockchain-client
 - [ ] `solana-x402.ts`: Integração com Solana x402 protocol
 - [ ] `base-fallback.ts`: Base como fallback
 - [ ] `microtx.ts`: Microtransações USDC
 
-### 4.3 Milestone S4
-- [ ] Pagamento funcional por inferência em testnet
+## Sprint 6: Federated Learning
 
-## Sprint 5: Federated Learning (Semanas 17-20)
-
-### 5.1 fl-training-client
+### 6.1 fl-training-client
 - [ ] `fed-yogi.ts`: Implementação FedYogi
 - [ ] `q-local-adam.ts`: Q-LocalAdam (8-bit optimizer states)
 - [ ] `fedadavr.ts`: FEDADAVR para alta evasão
 - [ ] `client-selection.ts`: Seleção heterogénea (bateria, Wi-Fi, thermal)
 
-### 5.2 Milestone S5
-- [ ] Treino federado funcional em 10+ dispositivos
+## Sprint 7: Beta
 
-## Sprint 6: Integração e Beta (Semanas 21-24)
-
-### 6.1 Integração
+### 7.1 Integração + Qualidade
 - [ ] Integrar todos os 8 pacotes
-- [ ] Testes de carga (100+ nós simulados)
-- [ ] Testes de falha (preempção, desconexão, throttling)
+- [ ] Testes de carga (100+ nós)
+- [ ] Stress test 30+ min, auditoria segurança, otimização bateria
 
-### 6.2 Qualidade
-- [ ] Auditoria de segurança
-- [ ] Stress test 30+ min contínuos
-- [ ] Otimização de bateria
-
-### 6.3 Beta
+### 7.2 Beta
 - [ ] Beta fechado (20 empresas, 500 dispositivos)
-- [ ] Dashboard de monitoramento
-- [ ] Documentação API
+- [ ] Dashboard, documentação API
 
 ---
 
 ## Backlog Técnico
 
-- [ ] Suporte a iOS (CoreML via ExecuTorch)
-- [ ] Suporte a Smart TVs (PWA + WebGPU)
-- [ ] zk-SNARKs para agregação FL verificável
-- [ ] Dynamic Shifting com shared-weight models
-- [ ] ARM CCA nativo (quando hardware disponível)
+- [ ] iOS (CoreML via ExecuTorch)
+- [ ] Smart TVs (PWA + WebGPU)
+- [ ] ARM CCA nativo
+- [ ] zk-SNARKs FL verificável
 - [ ] Multi-chain (Polygon, Arbitrum)
 - [ ] Plugin system para modelos customizados
 - [ ] LoRaWAN + acústica ultrassónica (ADR-015)
@@ -205,37 +123,29 @@
 
 ## Log de Conquistas
 
-### Sprint 1 (Junho 2026)
-- **Semana 1-2:** Monorepo setup, 8 pacotes TypeScript, SPRINT_0_PLANNING.md
-- **Semana 2-3:** Bug fixes (Automerge v2, web3.js v1, turbo.json v2, tsconfig)
-- **Semana 3-4:** Rust toolchain 1.96.0, WASM compilation (502KB), ~55 errors fixed
-- **Semana 4:** Tensor sharding (13 tests), TS stub, build.cjs temp dir, desktop-node-agent Tauri v2 fix
+### Sprint 3 (Junho 2026)
+- **Thermal Management:** ThermalManager (zone/trend/cooldown, 30 testes), DynamicShifter, WASM exports
+- **AI Usage Modes:** 4 modos (Relâmpago/Profundo/Agente/Silêncio), AI_USAGE_MODES.md
+- **App UI Scaffold:** React Native (Expo) + Next.js PWA com 3 modos + toggle monetização
+- **Web App Build:** Next.js 15 static export OK, sem warnings
 
-### Sprint 1.5 (Julho 2026)
-- **WASM JS Glue:** wasm-bindgen-cli 0.2.122 binary, JS glue (30KB) + types (6KB) + WASM otimizado (153KB)
-- **p2p-mesh-network:** 24 testes de integração, 3 bugs corrigidos (connect state, CRDT init, Automerge undefined)
-- **WebTransport Hello World FUNCIONAL:** @moq/web-transport (napi-rs) — QUIC connect ~170ms, echo roundtrip ~15ms, bidirectional streams, fork subprocesses
-- **ExecuTorch 1.2 API:** 5 backends, tensor types, model loader streaming, KNOWN_MODELS (Llama 3.2 1B/3B)
-- **Cross-Platform CI:** matrix ubuntu/macos/windows, Rust setup + WASM build pipeline
-- **Build/Tests:** pnpm build 8/8 OK, pnpm test 14/14 OK (37 testes)
-- **Promise.withResolvers polyfill** para Node.js v20 (@moq/web-transport requer v22)
-- **Fixes Windows path com acentos:** `fork()` > `spawn(shell:true)`; Node.js gerencia paths internamente
-- **@moq/web-transport bug:** `Request.ok()` consome request se `request.url` lido depois — ordem correcta: url antes de ok()
+### Sprint 4a (Junho 2026)
+- **Semantic Router:** HnswIndex + SemanticRouter (22 testes) + AgentMeshManager (8 testes)
+- **VCapabilityVector:** embedText hash-based + cosineSimilarity
+- **30 testes agentic mesh**, 100 testes p2p-mesh-network total
+- **7 test files** em p2p-mesh-network
 
-### Sprint 2 (Junho 2026)
-- **Rust warnings (19→0):** `#![allow(dead_code)]` no crate root, 2 fix manuais (parêntesis, unused variable)
-- **Push GitHub:** 3 commits — inicial, build loop fix, Sprint 2 (github.com/msrovani/SKYNET)
-- **Loop recursivo desktop-node-agent:** `build.cjs` agora é stub (evita `tauri build` loop)
-- **Pipeline Parallelism:** `PipelineManager` com partition proporcional, reconfiguração em falha, 9 testes
-- **Segment Means:** Compressão lossy de ativações (segment means), ratio configurável, 6 testes
-- **Total testes: 52** (13 core-wasm-engine + 39 p2p-mesh-network)
+### Sprint 4b (Junho 2026)
+- **TaskPlanner:** DAG decomposition com 4 templates, critical path, layers
+- **TopologyRouter:** AdaptOrch topology selection (parallel/seq/hierarchical/hybrid)
+- **FractionAggregator:** Checksum validation + artifact merge + consistency detection
+- **25 testes**, 125 testes p2p-mesh-network, 149 total
 
 ### Resultados Acumulados
 - **8/8 packages build OK** via `pnpm build` (Turborepo v2.9.16)
-- **52 testes** passando (13 core-wasm-engine + 39 p2p-mesh-network)
+- **149 testes** passando (24 core-wasm-engine + 125 p2p-mesh-network)
 - **14/14 tasks** successful em `pnpm test`
-- **WASM**: 502KB → 153KB (wasm-bindgen optimization), JS glue 30KB, types 6KB
-- **WebTransport**: Echo funcional — QUIC connect ~170ms, roundtrip ~15ms, bidirectional streams
-- **Pipeline Parallelism**: Layer partition por capacidade, reconfiguração em falha
-- **Segment Means**: Compressão lossy de ativações (ratio = segmentSize)
-- **ExecuTorch**: API completa com 5 backends, model loader, KNOWN_MODELS
+- **WASM**: 168KB, JS glue 34KB, types 8KB
+- **7 test files** p2p-mesh-network: pipeline, segment-means, speculative-decoding, thermal, agent-mesh, planner, p2p-integration
+- **WebTransport echo funcional** — QUIC connect ~170ms, roundtrip ~15ms
+- **Agentic Mesh**: Semantic Router + DAG Planner + Fraction Aggregator + Topology Router

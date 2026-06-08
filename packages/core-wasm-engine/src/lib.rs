@@ -10,6 +10,7 @@ mod evolution;
 mod autonomous;
 mod knowledge_graph;
 mod context_prune;
+mod inference;
 
 #[wasm_bindgen]
 pub fn get_thermal_headroom() -> f64 {
@@ -19,6 +20,30 @@ pub fn get_thermal_headroom() -> f64 {
 #[wasm_bindgen]
 pub fn compute_optimal_params(headroom: f64) -> JsValue {
     let params = thermal::compute_inference_params(headroom);
+    serde_wasm_bindgen::to_value(&params).unwrap_or(JsValue::NULL)
+}
+
+#[wasm_bindgen]
+pub fn compute_thermal_zone(headroom: f64, device_class: &str) -> JsValue {
+    let dc = match device_class {
+        "mobile" => thermal::DeviceClass::Mobile,
+        "laptop" => thermal::DeviceClass::Laptop,
+        "desktop" => thermal::DeviceClass::Desktop,
+        _ => thermal::DeviceClass::Mobile,
+    };
+    let zone = thermal::compute_zone(headroom, &dc);
+    serde_wasm_bindgen::to_value(&zone).unwrap_or(JsValue::NULL)
+}
+
+#[wasm_bindgen]
+pub fn compute_adaptive_params(headroom: f64, device_class: &str, trend: &str) -> JsValue {
+    let dc = match device_class {
+        "mobile" => thermal::DeviceClass::Mobile,
+        "laptop" => thermal::DeviceClass::Laptop,
+        "desktop" => thermal::DeviceClass::Desktop,
+        _ => thermal::DeviceClass::Mobile,
+    };
+    let params = thermal::compute_adaptive_params(headroom, &dc, trend);
     serde_wasm_bindgen::to_value(&params).unwrap_or(JsValue::NULL)
 }
 
@@ -176,4 +201,127 @@ pub fn verify_tensor_shard(shard: JsValue) -> bool {
     } else {
         false
     }
+}
+
+// -- Inference / Sharded Pipeline exports --
+
+#[wasm_bindgen]
+pub fn create_transformer_config(
+    num_layers: usize,
+    hidden_dim: usize,
+    num_heads: usize,
+    head_dim: usize,
+    ffn_hidden_dim: usize,
+    vocab_size: usize,
+    max_seq_len: usize,
+) -> JsValue {
+    let config = inference::TransformerConfig {
+        num_layers,
+        hidden_dim,
+        num_heads,
+        head_dim,
+        ffn_hidden_dim,
+        vocab_size,
+        max_seq_len,
+    };
+    serde_wasm_bindgen::to_value(&config).unwrap_or(JsValue::NULL)
+}
+
+#[wasm_bindgen]
+pub fn build_pipeline_plan(config: JsValue, host_ids: JsValue) -> JsValue {
+    let cfg: inference::TransformerConfig =
+        serde_wasm_bindgen::from_value(config).unwrap_or(inference::TransformerConfig {
+            num_layers: 1,
+            hidden_dim: 64,
+            num_heads: 2,
+            head_dim: 32,
+            ffn_hidden_dim: 128,
+            vocab_size: 1000,
+            max_seq_len: 128,
+        });
+    let hosts: Vec<String> = serde_wasm_bindgen::from_value(host_ids).unwrap_or_default();
+    let plan = inference::build_pipeline_plan(&cfg, &hosts);
+    serde_wasm_bindgen::to_value(&plan).unwrap_or(JsValue::NULL)
+}
+
+#[wasm_bindgen]
+pub fn build_sharded_pipeline_plan(config: JsValue, host_ids: JsValue, shards_per_layer: usize) -> JsValue {
+    let cfg: inference::TransformerConfig =
+        serde_wasm_bindgen::from_value(config).unwrap_or(inference::TransformerConfig {
+            num_layers: 1,
+            hidden_dim: 64,
+            num_heads: 2,
+            head_dim: 32,
+            ffn_hidden_dim: 128,
+            vocab_size: 1000,
+            max_seq_len: 128,
+        });
+    let hosts: Vec<String> = serde_wasm_bindgen::from_value(host_ids).unwrap_or_default();
+    let plan = inference::build_sharded_pipeline_plan(&cfg, &hosts, shards_per_layer);
+    serde_wasm_bindgen::to_value(&plan).unwrap_or(JsValue::NULL)
+}
+
+#[wasm_bindgen]
+pub fn estimate_inference_memory(config: JsValue) -> JsValue {
+    let cfg: inference::TransformerConfig =
+        serde_wasm_bindgen::from_value(config).unwrap_or(inference::TransformerConfig {
+            num_layers: 32,
+            hidden_dim: 4096,
+            num_heads: 32,
+            head_dim: 128,
+            ffn_hidden_dim: 14336,
+            vocab_size: 128256,
+            max_seq_len: 4096,
+        });
+    let est = inference::estimate_inference_memory(&cfg);
+    serde_wasm_bindgen::to_value(&est).unwrap_or(JsValue::NULL)
+}
+
+#[wasm_bindgen]
+pub fn estimate_peer_memory(config: JsValue, plan: JsValue, host_id: &str) -> JsValue {
+    let cfg: inference::TransformerConfig =
+        serde_wasm_bindgen::from_value(config).unwrap_or(inference::TransformerConfig {
+            num_layers: 32,
+            hidden_dim: 4096,
+            num_heads: 32,
+            head_dim: 128,
+            ffn_hidden_dim: 14336,
+            vocab_size: 128256,
+            max_seq_len: 4096,
+        });
+    let plan: inference::PipelinePlan = serde_wasm_bindgen::from_value(plan).unwrap_or(
+        inference::build_pipeline_plan(&cfg, &[]),
+    );
+    let est = inference::estimate_peer_memory(&cfg, &plan, host_id);
+    serde_wasm_bindgen::to_value(&est).unwrap_or(JsValue::NULL)
+}
+
+#[wasm_bindgen]
+pub fn create_kv_cache(config: JsValue) -> JsValue {
+    let cfg: inference::TransformerConfig =
+        serde_wasm_bindgen::from_value(config).unwrap_or(inference::TransformerConfig {
+            num_layers: 32,
+            hidden_dim: 4096,
+            num_heads: 32,
+            head_dim: 128,
+            ffn_hidden_dim: 14336,
+            vocab_size: 128256,
+            max_seq_len: 4096,
+        });
+    let cache = inference::create_kv_cache(&cfg);
+    serde_wasm_bindgen::to_value(&cache).unwrap_or(JsValue::NULL)
+}
+
+#[wasm_bindgen]
+pub fn inference_checkpoint_forward(
+    input: JsValue,
+    weights: JsValue,
+    hidden_dim: usize,
+    layer_idx: usize,
+    pos: usize,
+) -> JsValue {
+    let inp: Vec<f32> = serde_wasm_bindgen::from_value(input).unwrap_or_default();
+    let wgt: Vec<f32> = serde_wasm_bindgen::from_value(weights).unwrap_or_default();
+    let cp = inference::checkpoint_forward(&inp, &wgt, hidden_dim, layer_idx, pos);
+    serde_wasm_bindgen::to_value(&cp).unwrap_or(JsValue::NULL)
 }
