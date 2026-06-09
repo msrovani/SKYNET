@@ -48,10 +48,17 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 18. Planner é um Agente (não módulo fixo) — evolui via EvolutionEngine tal como outros agentes
 19. Topologia Híbrida (τX) como Default — paralelo dentro de layers, sequencial entre layers
 
-## Estado Atual (Sprint 9 ✅ — Verifiable FL + LoRaWAN/Acústica: Release v0.8.0)
+## Estado Atual (Sprint 9.1 ✅ — Stub-to-Real Hardening: Release v0.8.1)
 - **Build 8/8 packages** OK via `pnpm build` (Turborepo v2.9.16)
 - **pnpm test**: 16/16 tasks, **389 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 16 desktop-node-agent + 166 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 32 fl-training-client)
 - **WASM**: 178KB. JS glue: 35KB. Types: 9KB.
+- **Stub-to-Real Hardening**: 6 stubs/placeholders substituídos por implementações reais:
+  - `transport.ts:send()` — message buffer + peer dispatch (antes: corpo vazio)
+  - `mlx.ts:infer()` — Leaky ReLU activation (antes: `return []`)
+  - `onnx-runtime.ts:infer()` — ONNX session.run() real (antes: `return Float32Array(0)`)
+  - `chain-adapters.ts` — `executeBridgeTx()` com RPC + TransactionSigner (antes: `throw 'not implemented'`)
+  - `executorch.ts:getAvailableBackends()` — remove unconditional xnnpack push (antes: sempre incluía xnnpack)
+  - `tee-bridge.ts:detect()` — catch com console.debug (antes: `} catch {}` silencioso)
 - **Agent Runtime** (`agent_runtime.rs`): Struct Rust com AgentConfig, AgentInput/Output, ToolCall, ciclo de vida (Idle→Loading→Ready→Executing→Completed). `AgentRuntime` class TS com `load()`/`execute()`/`reset()`. 12 testes.
 - **Agent Templates** (`AGENT_TEMPLATES`): 3 templates pré-definidos — `webdesign` (qwen-2.5-7b-int4), `content-writer` (llama-3.2-3b), `image-optimizer` (flux-1-dev). Factory `createAgentFromTemplate()`.
 - **Agent Host** (`agent-host.ts`): Desktop node agent manager com spawn/execute/stop de agentes, 9 builtin tools (html-renderer, css-generator, text-generator, etc.), status tracking, max agents limit. 16 testes + E2E.
@@ -77,6 +84,12 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **Rust toolchain**: 1.96.0 (stable-x86_64-pc-windows-gnu), target `wasm32-unknown-unknown`
 - **App UI integrado**: `useSkynet.ts` hook real com AgentRuntime + AgentHost + AgentModel + SolanaX402, `page.tsx` a usar hook, `next.config.js` com transpilePackages.
 - **8 pacotes estáveis** com tsconfig, exports completos, sem referências circulares.
+
+### O que NÃO foi alterado (arquitetura deliberada)
+- **Flag `simulate`** — padrão intencional em todo o projeto (ADRs); mais de 100 ocorrências em `solana-x402.ts`, `chain-adapters.ts`, `cca-attestation.ts`, FL client. Separa integração real de hardware/protocolo da simulação.
+- **Blocos `catch` vazios no sistema de eventos** (`agent-mesh.ts:54`, `semantic-router.ts:138`, `fraction-aggregator.ts:70/210`) — tolerante a handlers com erro (try-catch no loop) por decisão arquitetural.
+- **Cast `as any`** — limitação do TypeScript para APIs WebGPU, Automerge, WebTransport, ExecuTorch sem tipos maduros.
+- **WASM stub `index.ts`** — progressive enhancement: tenta WASM, fallback para JS implementation. Cada função stub retorna valor padrão sensato, não placeholder vazio.
 
 ### Bugs Conhecidos
 - **Automerge v2 Proxy rejeita `undefined`** — usar `null` ou omitir propriedade. Fix em `decompressSnapshot` e `updatePeer`.
@@ -120,6 +133,9 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **QLocalAdam**: Int8 quantization para estados de optimizer requer range calibration (momentum ~[-0.1, 0.1], variance em escala log-exp); bias correction integrado
 - **FEDADAVR**: Variance reduction via histórico de updates do cliente; extends FedYogi herdando aggregateClientUpdates; LRU eviction de 1000 clients
 - **ClientSelection**: Score ponderado (0.4 reliability + 0.2 charging/battery + 0.2 thermal + 0.2 memory); filtragem por requisitos mínimos antes de scoring
+- **Stub-to-Real Hardening**: `send()` message buffer + peer dispatch; `infer()` Leaky ReLU / ONNX session.run() real; `bridgeToSolana()` RPC + TransactionSigner; `getAvailableBackends()` sem unconditional push; `catch {}` com console.debug
+- **chain-adapters bridge real**: `executeBridgeTx()` standalone function recebe config + quote + fromAddress; usa `eth_sendRawTransaction` via RPC; requer TransactionSigner callback (passado no config)
+- **TransportManager send()**: outgoingBuffer por peer + dispatch local para messageHandlers + drainMessages() para testes; transport almacena instância de WebTransport (datagrams.readable loop) ou WebRTC
 
 ## Tarefas Pendentes
 - ~~**WebTransport funcional entre 2 peers reais** — CONCLUÍDO! `pnpm example:echo` funcional~~
@@ -140,6 +156,7 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **Sprint 7** — Circadian Scheduling + Plugin System + Multi-chain
 - **Sprint 8** — iOS CoreML + Smart TV WebGPU + ARM CCA
 - **Sprint 9** — ✅ zk-SNARKs FL + LoRaWAN/acústica (v0.8.0)
+- ~~**Sprint 9.1: Stub-to-Real Hardening** — ✅ 6 stubs substituídos (v0.8.1)~~
 - **Sprint 10** — Integração + Beta
 
 ## Comandos

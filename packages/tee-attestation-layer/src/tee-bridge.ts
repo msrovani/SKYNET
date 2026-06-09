@@ -80,7 +80,9 @@ export class TeeBridge {
           version: '1.5',
         };
       }
-    } catch {}
+    } catch (err) {
+      console.debug('[SKYNET] TEE detection error:', err);
+    }
 
     if (typeof process !== 'undefined') {
       const arch: string = process.arch;

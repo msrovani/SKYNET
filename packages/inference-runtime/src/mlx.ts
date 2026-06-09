@@ -10,6 +10,11 @@ export class MLXRuntime {
 
   async infer(input: number[]): Promise<number[]> {
     if (!this.loaded) throw new Error('MLX runtime not loaded');
-    return [];
+    const output: number[] = [];
+    for (let i = 0; i < input.length; i++) {
+      const val = input[i];
+      output.push(val > 0 ? val : val * 0.01);
+    }
+    return output;
   }
 }

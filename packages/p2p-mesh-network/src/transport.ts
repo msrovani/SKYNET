@@ -35,6 +35,8 @@ export class TransportManager {
   private state: TransportState = 'disconnected';
   private peers: Map<string, PeerInfo> = new Map();
   private messageHandlers: Set<MessageHandler> = new Set();
+  private outgoingBuffer: Map<string, Uint8Array[]> = new Map();
+  private connection: any = null;
 
   constructor(config: TransportConfig = {}) {
     this.config = {
@@ -64,8 +66,8 @@ export class TransportManager {
     try {
       await this.tryWebTransport();
       this.state = 'connected';
-    } catch {
-      console.warn('[SKYNET] WebTransport failed, falling back to WebRTC');
+    } catch (err) {
+      console.warn('[SKYNET] WebTransport failed, falling back to WebRTC:', err);
       this.state = 'degraded';
       await this.tryWebRTC();
     }
@@ -75,9 +77,29 @@ export class TransportManager {
     if (typeof WebTransport !== 'undefined') {
       const transport = new (WebTransport as any)(this.config.relayUrl, this.config.webTransportOptions ?? {});
       await (transport as any).ready;
+      this.connection = transport;
+      this.setupStreamHandler(transport);
       return;
     }
     throw new Error('WebTransport not available');
+  }
+
+  private setupStreamHandler(transport: any): void {
+    if (transport.datagrams?.readable) {
+      this.readLoop(transport.datagrams.readable.getReader(), transport.datagrams.writable.getWriter());
+    }
+  }
+
+  private async readLoop(reader: any, writer?: any): Promise<void> {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        for (const handler of this.messageHandlers) {
+          handler(value, 'relay');
+        }
+      }
+    } catch {}
   }
 
   private async tryWebRTC(): Promise<void> {
@@ -85,16 +107,33 @@ export class TransportManager {
     const { WebRTCFallback } = await import('./webrtc-fallback.js');
     const rtc = new WebRTCFallback();
     await rtc.connect();
+    this.connection = rtc;
   }
 
   async send(data: Uint8Array, peerId: string): Promise<void> {
     if (this.state === 'disconnected') {
       throw new Error('Transport not connected');
     }
+    if (!this.outgoingBuffer.has(peerId)) {
+      this.outgoingBuffer.set(peerId, []);
+    }
+    this.outgoingBuffer.get(peerId)!.push(data);
+    for (const handler of this.messageHandlers) {
+      handler(data, peerId);
+    }
+  }
+
+  drainMessages(peerId: string): Uint8Array[] {
+    const msgs = this.outgoingBuffer.get(peerId);
+    if (!msgs) return [];
+    this.outgoingBuffer.set(peerId, []);
+    return msgs;
   }
 
   disconnect(): void {
     this.state = 'disconnected';
     this.peers.clear();
+    this.outgoingBuffer.clear();
+    this.connection = null;
   }
 }

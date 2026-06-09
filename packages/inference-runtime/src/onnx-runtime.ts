@@ -18,6 +18,11 @@ export class OnnxRuntimeWeb {
     if (!this.loaded || !this.session) {
       throw new Error('ONNX Runtime not loaded');
     }
-    return new Float32Array(0);
+    const inputTensor = new this.session.Tensor('float32', input, dims);
+    const feeds: Record<string, any> = {};
+    feeds[this.session.inputNames[0]] = inputTensor;
+    const results = await this.session.run(feeds);
+    const output = results[this.session.outputNames[0]];
+    return output.data instanceof Float32Array ? output.data : new Float32Array(output.data as number[]);
   }
 }

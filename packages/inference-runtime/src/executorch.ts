@@ -50,8 +50,29 @@ export function getAvailableBackends(): ExecuTorchBackend[] {
   const backends: ExecuTorchBackend[] = [];
   if (typeof navigator !== 'undefined' && 'gpu' in navigator) backends.push('vulkan');
   if (typeof (globalThis as any).executorch !== 'undefined') backends.push('xnnpack');
-  backends.push('xnnpack');
+  if (typeof process !== 'undefined') {
+    if (process.platform === 'darwin') {
+      backends.push('mps');
+    }
+  }
   return backends;
+}
+
+export function getHardwareBackends(): ExecuTorchBackend[] {
+  const backends: ExecuTorchBackend[] = [];
+  if (typeof navigator !== 'undefined' && 'gpu' in navigator) backends.push('vulkan');
+  if (typeof (globalThis as any).executorch !== 'undefined') backends.push('xnnpack');
+  if (typeof process !== 'undefined') {
+    const platform = process.platform;
+    if (platform === 'darwin') {
+      backends.push('mps');
+      backends.push('coreml');
+    }
+    if (platform === 'android' || platform === 'linux') {
+      backends.push('qnn');
+    }
+  }
+  return [...new Set(backends)];
 }
 
 export function recommendBackend(deviceMemoryGb: number, isMobile: boolean): ExecuTorchBackend {
