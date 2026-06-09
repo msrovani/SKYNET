@@ -48,9 +48,9 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 18. Planner é um Agente (não módulo fixo) — evolui via EvolutionEngine tal como outros agentes
 19. Topologia Híbrida (τX) como Default — paralelo dentro de layers, sequencial entre layers
 
-## Estado Atual (Sprint 9.1 ✅ — Stub-to-Real Hardening: Release v0.8.1)
+## Estado Atual (Sprint 9.2 ✅ — Stub-to-Real Hardening + Word-Level Embeddings: Release v0.8.2)
 - **Build 8/8 packages** OK via `pnpm build` (Turborepo v2.9.16)
-- **pnpm test**: 16/16 tasks, **389 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 16 desktop-node-agent + 166 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 32 fl-training-client)
+- **pnpm test**: 16/16 tasks, **390 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 16 desktop-node-agent + 167 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 32 fl-training-client)
 - **WASM**: 178KB. JS glue: 35KB. Types: 9KB.
 - **Stub-to-Real Hardening**: 6 stubs/placeholders substituídos por implementações reais:
   - `transport.ts:send()` — message buffer + peer dispatch (antes: corpo vazio)
@@ -59,6 +59,7 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
   - `chain-adapters.ts` — `executeBridgeTx()` com RPC + TransactionSigner (antes: `throw 'not implemented'`)
   - `executorch.ts:getAvailableBackends()` — remove unconditional xnnpack push (antes: sempre incluía xnnpack)
   - `tee-bridge.ts:detect()` — catch com console.debug (antes: `} catch {}` silencioso)
+- **Word-Level Embeddings** (`capability.ts:embedText()`): hash→word-level random projection. Shared words now produce cos>0. 1 new test. (v0.8.2)
 - **Agent Runtime** (`agent_runtime.rs`): Struct Rust com AgentConfig, AgentInput/Output, ToolCall, ciclo de vida (Idle→Loading→Ready→Executing→Completed). `AgentRuntime` class TS com `load()`/`execute()`/`reset()`. 12 testes.
 - **Agent Templates** (`AGENT_TEMPLATES`): 3 templates pré-definidos — `webdesign` (qwen-2.5-7b-int4), `content-writer` (llama-3.2-3b), `image-optimizer` (flux-1-dev). Factory `createAgentFromTemplate()`.
 - **Agent Host** (`agent-host.ts`): Desktop node agent manager com spawn/execute/stop de agentes, 9 builtin tools (html-renderer, css-generator, text-generator, etc.), status tracking, max agents limit. 16 testes + E2E.
@@ -96,7 +97,7 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **Accented Windows paths** quebram GNU linker. WASM build usa `%TEMP%\skynet-wasm-build` (ASCII-only). `fork()` works com paths acentuados (Node.js gerencia internamente); `spawn()` quebra com `shell:true`.
 - **web-sys 0.3.99** lacks WebGPU bindings. WebGPU module stubbed.
 - **@moq/web-transport v0.1.2** `Request.ok()` retorna "request already consumed" se usado após `request.url`; ordem correcta: `url` antes de `ok()`.
-- **embedText() hash-based** não produz embeddings semanticamente significativos — é um hash determinístico normalizado. Substituir por sentence-transformer real quando disponível.
+- ~~**embedText() hash-based** — substituído por word-level random projection (v0.8.2)~~
 
 ### Rotina de Release
 - Cada sprint termina com: bump version → CHANGELOG update → README roadmap update → git tag
@@ -126,8 +127,8 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **SemanticRouter**: peso combinado = 0.5*semantic + 0.3*toolMatch − 0.1*cost − 0.1*latency penaliza agentes lentos/caros
 - **HnswIndex TS**: abordagem simplificada com randomLevel e vizinhança limitada a 16; layers múltiplas para aproximar busca hierárquica
 - **AgentMeshManager**: health monitoring via missedHeartbeats (3 misses→offline); heartbeatInterval 5s, timeout 15s
-- **embedText hash-based**: determinístico para texto idêntico (cosine=1), pseudo-aleatório para textos diferentes. Não captura semântica — placeholder até integration com SBERT
-- **Testes com hash embeddings**: só comparar identical string (sim=1) vs different string (sim<1); não assumir similaridade semântica real
+- **embedText word-level random projection**: cada palavra contribui para 5 dimensões (hash→dim), normalização L2. Mesmo texto → cos=1; palavras partilhadas → cos>0. Captura similaridade semântica básica sem deps externas
+- **Testes com embeddings word-level**: identical string (sim=1), different words (sim≈0), related words (sim>0.5). Adicionado teste de similaridade semântica real (webdesign relacionado > webdesign vs content)
 - **Event system**: padrão onEvent/emit com Set<Callback> e cleanup function; tolerante a handlers com erro (try-catch no loop)
 - **FedYogi**: Yogi adaptive optimizer usa sign(variance - g^2) para update rule, diferente de AdamW; learning rate server-side separado do client-side
 - **QLocalAdam**: Int8 quantization para estados de optimizer requer range calibration (momentum ~[-0.1, 0.1], variance em escala log-exp); bias correction integrado
@@ -157,6 +158,7 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **Sprint 8** — iOS CoreML + Smart TV WebGPU + ARM CCA
 - **Sprint 9** — ✅ zk-SNARKs FL + LoRaWAN/acústica (v0.8.0)
 - ~~**Sprint 9.1: Stub-to-Real Hardening** — ✅ 6 stubs substituídos (v0.8.1)~~
+- ~~**Sprint 9.2: Word-Level Embeddings** — ✅ embedText word-level random projection (v0.8.2)~~
 - **Sprint 10** — Integração + Beta
 
 ## Comandos

@@ -52,17 +52,23 @@ export function deserializeCapability(data: Uint8Array): NodeCapability {
 
 export function embedText(text: string, dimensions: number = 64): Float32Array {
   const vec = new Float32Array(dimensions);
-  let seed = 0;
-  for (let i = 0; i < text.length; i++) {
-    seed = ((seed << 5) - seed + text.charCodeAt(i)) | 0;
-  }
-  for (let d = 0; d < dimensions; d++) {
-    seed = (seed * 1103515245 + 12345) | 0;
-    vec[d] = (seed >>> 0) / 0xFFFFFFFF;
+  const words = text.toLowerCase().match(/\p{L}+/gu) || [];
+  for (const word of words) {
+    let seed = 0;
+    for (let i = 0; i < word.length; i++) {
+      seed = ((seed << 5) - seed + word.charCodeAt(i)) | 0;
+    }
+    for (let p = 0; p < 5; p++) {
+      seed = (seed * 1103515245 + 12345) | 0;
+      const dim = Math.abs(seed) % dimensions;
+      vec[dim] += 1;
+    }
   }
   const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0));
-  for (let d = 0; d < dimensions; d++) {
-    vec[d] /= norm || 1;
+  if (norm > 0) {
+    for (let d = 0; d < dimensions; d++) {
+      vec[d] /= norm;
+    }
   }
   return vec;
 }

@@ -157,9 +157,9 @@ describe('SemanticRouter', () => {
   it('returns top-K matches', () => {
     const subtask: SubTask = {
       id: 'st-4',
-      description: 'Design a website with text content',
+      description: 'Create a responsive HTML page with CSS',
       domain: 'webdesign',
-      requiredTools: [],
+      requiredTools: ['html-renderer'],
       dependsOn: [],
     };
     const topK = router.routeTopK(subtask, 2);
@@ -407,5 +407,14 @@ describe('embedText and cosineSimilarity', () => {
     const a = new Float32Array([1, 0]);
     const b = new Float32Array([0, 1]);
     expect(cosineSimilarity(a, b)).toBeCloseTo(0, 5);
+  });
+
+  it('semantically related texts have higher similarity than unrelated', () => {
+    const webDesignText = embedText('webdesign html css javascript responsive frontend css html responsive', 64);
+    const contentWritingText = embedText('content writing blog copywriting article text editing', 64);
+    const similarToWeb = embedText('html css responsive layout frontend framework css grid', 64);
+    const unrelated = embedText('quantum physics particle wave theory mechanics', 64);
+    expect(cosineSimilarity(webDesignText, similarToWeb)).toBeGreaterThan(cosineSimilarity(webDesignText, contentWritingText));
+    expect(cosineSimilarity(webDesignText, similarToWeb)).toBeGreaterThan(cosineSimilarity(webDesignText, unrelated));
   });
 });
