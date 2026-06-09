@@ -61,3 +61,22 @@ export {
   type AgentFraction, type AggregatedResult,
   type AggregatorEvent, type AggregatorCallback,
 } from './fraction-aggregator.js';
+
+export {
+  LoRaCrdtSync, estimateLoRaDuration,
+  type LoRaWanConfig, type LoRaWanPacket,
+  type LoRaSyncResult, type LoRaWanClass,
+} from './lora-crdt-sync.js';
+
+export {
+  AcousticCrdtSync, estimateAcousticDuration,
+  type AcousticConfig, type AcousticModulation, type AcousticBand,
+  type AcousticPacket, type AcousticSyncResult,
+} from './acoustic-crdt-sync.js';
+
+export {
+  OpportunisticRouter,
+  type TransportType, type TransportLink, type SyncRoute,
+  type RouterEvent as OpportunisticRouterEvent,
+  type RouterCallback as OpportunisticRouterCallback,
+} from './opportunistic-router.js';

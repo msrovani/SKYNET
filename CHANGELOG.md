@@ -1,6 +1,18 @@
 # Changelog
 
-## [0.7.0] — 2026-07-08 — Sprint 8: iOS CoreML + Smart TV + ARM CCA
+## [0.8.0] — 2026-07-08 — Sprint 9: Verifiable FL + LoRaWAN/Acústica
+
+### Added
+- **zk-SNARKs FL** (`fl-training-client`): `ZkFlProver` — proof generation (Groth16/PLONK/STARK), batch proofs, simulated + hardware mode, size estimation. `ZkFlVerifier` — single/batch verify, scheme filtering, max size check, gradient integrity. 13 testes.
+- **LoRaWAN CRDT Sync** (`p2p-mesh-network`): `LoRaCrdtSync` — spreading factor SF7-12, bandwidth 125-500kHz, coding rate 4/5-4/8, Class A/B/C, fragmentação, CRC32, retry configurável, simulação de perda de pacotes. `estimateLoRaDuration()`. 9 testes.
+- **Acoustic CRDT Sync** (`p2p-mesh-network`): `AcousticCrdtSync` — FSK/MSK/OFDM modulation, bandas audible/near-ultrasonic/ultrasonic (200Hz-48kHz), checksum, signal quality. `estimateAcousticDuration()`. 10 testes.
+- **Opportunistic Transport Router** (`p2p-mesh-network`): `OpportunisticRouter` — fila prioritária IP→LoRa→Acoustic com fallthrough automático, eventos (transport-selected/transport-failed/fallback-activated/sync-completed), integração com CrdtSync + FailoverManager, `estimateBestRoute()`. 10 testes.
+
+### Tests
+- **389 total** (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 16 desktop-node-agent + 166 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 32 fl-training-client).
+- 16/16 tasks pass via `pnpm test`.
+
+---
 
 ### Added
 - **iOS CoreML** (`inference-runtime`): `CoreMLRuntime` — delegate ANE/GPU/CPU, `detectPlatform()`, `recommendDelegate()` por chip (M4/A18/A17), `optimizeForModel()` por parâmetros, `checkANEAvailability()`. 12 testes.

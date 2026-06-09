@@ -4,8 +4,8 @@
 
 [![CI](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml/badge.svg)](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.7.0-green.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-347%20passing-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/version-0.8.0-green.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-389%20passing-brightgreen.svg)]()
 
 ---
 
@@ -351,7 +351,7 @@ Sprint 5 ████████████████████ 100%  TEE 
 Sprint 6 ████████████████████ 100%  Federated Learning
 Sprint 7 ████████████████████ 100%  Circadian + Plugin System + Multi-chain
 Sprint 8 ████████████████████ 100%  iOS CoreML + Smart TV + ARM CCA
-Sprint 9 ░░░░░░░░░░░░░░░░░░░░   0%  zk-SNARKs FL + LoRaWAN/Acústica
+Sprint 9 ████████████████████ 100%  zk-SNARKs FL + LoRaWAN/Acústica
 Sprint 10 ░░░░░░░░░░░░░░░░░░░░   0%  Integração + Beta
 ```
 
@@ -360,7 +360,7 @@ Sprint 10 ░░░░░░░░░░░░░░░░░░░░   0%  Int
 | Componente | Estado |
 |-----------|--------|
 | `pnpm install` + `pnpm build` | ✅ 8/8 packages |
-| `pnpm test` | ✅ 347 testes passam (41 core-wasm + 47 blockchain + 43 inference + 16 desktop + 137 p2p + 37 tee + 7 app-ui + 19 fl) |
+| `pnpm test` | ✅ 389 testes passam (41 core-wasm + 47 blockchain + 43 inference + 16 desktop + 166 p2p + 37 tee + 7 app-ui + 32 fl) |
 | WebTransport echo demo (`pnpm example:echo`) | ✅ QUIC ~170ms, roundtrip ~15ms |
 | Pipeline Parallelism (código + testes) | ✅ Layer partition por capacidade |
 | Segment Means compression (código + testes) | ✅ Compressão lossy de ativações |
@@ -390,6 +390,10 @@ Sprint 10 ░░░░░░░░░░░░░░░░░░░░   0%  Int
 | iOS CoreML delegate (via ExecuTorch) | ✅ 12 testes (ANE, chip optimization) |
 | WebGPU preprocess + TV adaptive PWA | ✅ 8 testes WebGPU + useTvPlatform hook |
 | ARM CCA native attestation | ✅ 13 testes (realm, attest, verify) |
+| zk-SNARKs FL prover + verifier | ✅ 13 testes (proof gen, verify, batch, scheme filter) |
+| LoRaWAN CRDT sync | ✅ 9 testes (SF, fragmentação, CRC32, loss) |
+| Acoustic CRDT sync (ultrassom) | ✅ 10 testes (FSK/MSK, bandas 200-48kHz) |
+| Opportunistic transport router | ✅ 10 testes (IP→LoRa→Acoustic fallthrough) |
 
 ### O que NÃO funciona ainda (próximas sprints)
 
@@ -398,8 +402,8 @@ Sprint 10 ░░░░░░░░░░░░░░░░░░░░   0%  Int
 | **iOS (CoreML via ExecuTorch)** | ✅ Sprint 8 (12 testes) |
 | **Smart TVs (PWA + WebGPU)** | ✅ Sprint 8 (8 testes WebGPU + hook React) |
 | **ARM CCA nativo** | ✅ Sprint 8 (13 testes CCA) |
-| **zk-SNARKs FL verificável** | Sprint 9 |
-| **LoRaWAN + acústica ultrassónica (ADR-015)** | Sprint 9 |
+| **zk-SNARKs FL verificável** | ✅ Sprint 9 (13 testes prover + verifier) |
+| **LoRaWAN + acústica ultrassónica (ADR-015)** | ✅ Sprint 9 (29 testes LoRa + acoustic + router) |
 | **Beta fechado (20 empresas)** | Sprint 10 |
 | **Beta público instalável** | Sprint 10 (target) |
 

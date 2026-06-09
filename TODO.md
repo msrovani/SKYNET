@@ -134,20 +134,20 @@
 - [x] CCA provider para TeeBridge (detecção arm64/aarch64)
 - [x] Integração com tee-attestation-layer
 
-## Sprint 9: Verifiable FL + Fallback Extremo
+## Sprint 9: Verifiable FL + Fallback Extremo ✅
 
-### 9.1 zk-SNARKs FL verificável
-- [ ] `zk-fl-verifier.ts`: Verificação SNARK de updates FL
-- [ ] `zk-fl-prover.ts`: Prova de computação correta no cliente
-- [ ] Integração com FedYogi + FEDADAVR
-- [ ] Testes: proof generation, verification, batch verify
+### 9.1 zk-SNARKs FL verificável ✅
+- [x] `zk-fl-prover.ts`: ZkFlProver — proof generation, batch proof, simulated + hardware mode, size estimation (7 testes)
+- [x] `zk-fl-verifier.ts`: ZkFlVerifier — single/batch verify, scheme filtering, size check, gradient integrity (6 testes)
+- [x] Integração com FedYogi + FEDADAVR
+- [x] 13 testes: proof generation, verification, batch verify, scheme filter, oversize reject
 
-### 9.2 LoRaWAN + Acústica Ultrassónica (ADR-015)
-- [ ] `lora-crdt-sync.ts`: Sync CRDT via LoRaWAN (baixa largura de banda)
-- [ ] `acoustic-crdt-sync.ts`: Sync CRDT via ultrassom (dispositivos próximos)
-- [ ] Router de transporte opportunistic (LoRa ↔ acústica ↔ IP)
-- [ ] Integração com CrdtSync + FailoverManager
-- [ ] Testes: sync com perda de pacotes, fallback automático
+### 9.2 LoRaWAN + Acústica Ultrassónica (ADR-015) ✅
+- [x] `lora-crdt-sync.ts`: LoRaCrdtSync — SF7-12, BW125-500, CR4/5-4/8, Class A/B/C, fragmentação, CRC32, retry, packet loss sim (9 testes)
+- [x] `acoustic-crdt-sync.ts`: AcousticCrdtSync — FSK/MSK/OFDM, audible/near-ultrasonic/ultrasonic, bandas 200Hz-48kHz, checksum (10 testes)
+- [x] `opportunistic-router.ts`: OpportunisticRouter — fila prioritária IP→LoRa→Acoustic, fallthrough em falha, eventos route-selected/transport-failed/fallback-activated (10 testes)
+- [x] Integração com CrdtSync + FailoverManager
+- [x] 29 testes: sync, fragmentação, perda pacotes, fallback automático, eventos
 
 ## Sprint 10: Integração + Beta
 
@@ -223,9 +223,16 @@
 - **ARM CCA Attestation:** CcaAttestation, realm lifecycle, measurement hash, nonce challenge (13 testes)
 - **33 testes novos**, 347 tests totais, 16/16 tasks
 
+### Sprint 9 (Julho 2026)
+- **zk-SNARKs FL:** ZkFlProver + ZkFlVerifier, proof generation/verification, batch verify, scheme filter (13 testes)
+- **LoRaWAN CRDT Sync:** LoRaCrdtSync, SF7-12, fragmentação, CRC32, retry, packet loss (9 testes)
+- **Acoustic CRDT Sync:** AcousticCrdtSync, FSK/MSK/OFDM, bandas 200Hz-48kHz (10 testes)
+- **Opportunistic Router:** IP→LoRa→Acoustic fallthrough, eventos, CrdtSync + FailoverManager integration (10 testes)
+- **42 testes novos**, 389 tests totais, 16/16 tasks
+
 ### Resultados Acumulados
 - **8/8 packages build OK** via `pnpm build` (Turborepo v2.9.16)
-- **347 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 16 desktop-node-agent + 137 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 19 fl-training-client)
+- **389 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 16 desktop-node-agent + 166 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 32 fl-training-client)
 - **16/16 tasks** successful em `pnpm test`
 - **WASM**: 178KB, JS glue 35KB, types 9KB
 - **Agent Runtime**: Rust WASM + TS stub + AGENT_TEMPLATES
