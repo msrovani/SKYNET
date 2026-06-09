@@ -1,6 +1,17 @@
 # Changelog
 
-## [0.5.0] — 2026-07-08 — Sprint 5-6: Segurança + Blockchain + Federated Learning
+## [0.6.0] — 2026-07-08 — Sprint 7: Circadian + Plugins + Multi-chain
+
+### Added
+- **Circadian-Aware Scheduling** (`p2p-mesh-network`): `CircadianScheduler` — segue o terminador terrestre, scores sazonais, integração com ThermalManager + DynamicShifter. 12 testes.
+- **Plugin System** (`inference-runtime`): `PluginSchema`/`ModelPluginCard` (validação), `PluginRegistry` (registo semântico, upgrade/downgrade, checksum BLAKE3, search, manifest), `PluginLoader` (HuggingFace/ONNX/URL, memory check, cache). 16 testes.
+- **Multi-chain** (`blockchain-client`): `PolygonAdapter` (bridge x402 L2), `ArbitrumAdapter` (bridge x402 L2), `MultiChainRouter` (seleção por fee/speed, preferred chain, max fee filter, eventos route-selected/bridge-completed). 12 testes.
+
+### Tests
+- **313 total** (41 core-wasm-engine + 47 blockchain-client + 23 inference-runtime + 16 desktop-node-agent + 137 p2p-mesh-network + 24 tee-attestation-layer + 6 app-ui-orchestrator + 19 fl-training-client).
+- 16/16 tasks pass via `pnpm test`.
+
+---
 
 ### Added
 - **TEE Attestation** (`tee-attestation-layer`): Remote Attestation SGX simulation (quote/verify/measurement, nonce challenge-response), TeeBridge (detecção automática SGX/SEV/CCA), Proof of Time (FLOPS tracking, signature vinculada). 24 testes.

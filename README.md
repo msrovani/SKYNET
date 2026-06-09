@@ -4,8 +4,8 @@
 
 [![CI](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml/badge.svg)](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.5.0-green.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-273%20passing-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/version-0.6.0-green.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-313%20passing-brightgreen.svg)]()
 
 ---
 
@@ -349,7 +349,10 @@ Sprint 4c ████████████████████ 100%  Age
 Sprint 4d ████████████████████ 100%  Agentic Mesh: UI + Payments + Release
 Sprint 5 ████████████████████ 100%  TEE Attestation + Blockchain Client
 Sprint 6 ████████████████████ 100%  Federated Learning
-Sprint 7 ░░░░░░░░░░░░░░░░░░░░   0%  Integração + Beta
+Sprint 7 ████████████████████ 100%  Circadian + Plugin System + Multi-chain
+Sprint 8 ░░░░░░░░░░░░░░░░░░░░   0%  iOS CoreML + Smart TV + ARM CCA
+Sprint 9 ░░░░░░░░░░░░░░░░░░░░   0%  zk-SNARKs FL + LoRaWAN/Acústica
+Sprint 10 ░░░░░░░░░░░░░░░░░░░░   0%  Integração + Beta
 ```
 
 ### O que funciona HOJE (podes executar)
@@ -357,7 +360,7 @@ Sprint 7 ░░░░░░░░░░░░░░░░░░░░   0%  Inte
 | Componente | Estado |
 |-----------|--------|
 | `pnpm install` + `pnpm build` | ✅ 8/8 packages |
-| `pnpm test` | ✅ 273 testes passam (41 core-wasm + 35 blockchain + 7 inference + 16 desktop + 125 p2p + 24 tee + 6 app-ui + 19 fl) |
+| `pnpm test` | ✅ 313 testes passam (41 core-wasm + 47 blockchain + 23 inference + 16 desktop + 137 p2p + 24 tee + 6 app-ui + 19 fl) |
 | WebTransport echo demo (`pnpm example:echo`) | ✅ QUIC ~170ms, roundtrip ~15ms |
 | Pipeline Parallelism (código + testes) | ✅ Layer partition por capacidade |
 | Segment Means compression (código + testes) | ✅ Compressão lossy de ativações |
@@ -381,21 +384,21 @@ Sprint 7 ░░░░░░░░░░░░░░░░░░░░   0%  Inte
 | TEE Remote Attestation (código + testes) | ✅ 24 testes (SGX sim, bridge, Proof of Time) |
 | Solana x402 + Base fallback + State Channels | ✅ 35 testes (quote, pay, verify, microtx) |
 | Federated Learning (FedYogi + QLocalAdam + FEDADAVR + ClientSelection) | ✅ 19 testes, todos os 4 módulos |
+| Circadian-Aware Scheduling (ADR-014) | ✅ 12 testes, terminador, scores sazonais |
+| Plugin System para modelos customizados | ✅ 16 testes (schema, registry, loader) |
+| Multi-chain (Polygon, Arbitrum, router) | ✅ 12 testes (quotes, bridge, routing) |
 
 ### O que NÃO funciona ainda (próximas sprints)
 
 | Funcionalidade | Previsão |
 |---------------|----------|
-| **Beta fechado (20 empresas)** | Sprint 7 |
-| **Beta público instalável** | Sprint 7 (target) |
-| **iOS (CoreML via ExecuTorch)** | Backlog |
-| **Smart TVs (PWA + WebGPU)** | Backlog |
-| **ARM CCA nativo** | Backlog |
-| **zk-SNARKs FL verificável** | Backlog |
-| **Multi-chain (Polygon, Arbitrum)** | Backlog |
-| **Plugin system para modelos customizados** | Backlog |
-| **LoRaWAN + acústica ultrassónica (ADR-015)** | Backlog |
-| **Circadian-Aware Scheduling (ADR-014)** | Backlog |
+| **iOS (CoreML via ExecuTorch)** | Sprint 8 |
+| **Smart TVs (PWA + WebGPU)** | Sprint 8 |
+| **ARM CCA nativo** | Sprint 8 |
+| **zk-SNARKs FL verificável** | Sprint 9 |
+| **LoRaWAN + acústica ultrassónica (ADR-015)** | Sprint 9 |
+| **Beta fechado (20 empresas)** | Sprint 10 |
+| **Beta público instalável** | Sprint 10 (target) |
 
 > **⚠️ SKYNET está em desenvolvimento ativo (Pre-Alpha).** Código funcional, testado e buildável — mas não instalável por utilizadores finais. Se és developer ou early adopter, contribui ou acompanha em [github.com/msrovani/SKYNET](https://github.com/msrovani/SKYNET).
 

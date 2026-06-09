@@ -88,7 +88,7 @@
 - [x] `microtx.ts`: Microtransações USDC (11 testes)
 - [x] `agent-payments.ts`: Agent payments via x402 (5 testes)
 
-## Sprint 6: Federated Learning 🏃
+## Sprint 6: Federated Learning ✅
 
 ### 6.1 fl-training-client
 - [x] `fed-yogi.ts`: FedYogi — adaptive server optimizer com momentum/variance (Yogi rule)
@@ -97,29 +97,71 @@
 - [x] `client-selection.ts`: Seleção heterogénea (bateria, Wi-Fi, thermal, memória, reliability)
 - [x] Testes unitários: 19 (4 FedYogi + 4 QLocalAdam + 5 FEDADAVR + 6 ClientSelection)
 
-## Sprint 7: Beta
+## Sprint 7: Scheduling + Plugin System + Multi-chain
 
-### 7.1 Integração + Qualidade
-- [ ] Integrar todos os 8 pacotes
-- [ ] Testes de carga (100+ nós)
+### 7.1 Circadian-Aware Scheduling (ADR-014) ✅
+- [x] `circadian-scheduler.ts`: Scheduler que segue o terminador terrestre
+- [x] Modelo de carga: dia → dispositivos urbanos, noite → PCs/workstations
+- [x] Integração com ThermalManager + DynamicShifter (score combinado)
+- [x] 12 testes: local hour, night detection, terminator longitude, scores, selection
+
+### 7.2 Plugin System para Modelos Customizados ✅
+- [x] `plugin-types.ts`: Schema de plugin (ModelPluginCard, PluginSchema, validação)
+- [x] `plugin-registry.ts`: Registo com versionamento semântico, checksum, search, manifest import/export
+- [x] `plugin-loader.ts`: Loading dinâmico (HuggingFace, ONNX Zoo, URL), memory check, cache
+- [x] 16 testes: validation, register, upgrade, downgrade, remove, search, verify, manifest, events, loader
+
+### 7.3 Multi-chain (Polygon, Arbitrum) ✅
+- [x] `chain-adapters.ts`: PolygonAdapter + ArbitrumAdapter com bridge x402 simulado
+- [x] `multi-chain-router.ts`: Roteamento fee/speed, preferred chain, max fee, eventos
+- [x] Integração com blockchain-client + SolanaX402
+- [x] 12 testes: quotes, bridge, routing, fallback, events
+
+## Sprint 8: Mobile + TV + ARM CCA
+
+### 8.1 iOS CoreML via ExecuTorch
+- [ ] CoreML delegate para ExecuTorch (iOS runtime)
+- [ ] Testes em dispositivo: iPhone 14-17, iPad
+- [ ] Integração com AgentModel + inference-runtime
+
+### 8.2 Smart TVs (PWA + WebGPU)
+- [ ] WebGPU compute shaders para pré-processamento em TV
+- [ ] PWA adaptativo: Samsung Tizen, LG webOS, Android TV
+- [ ] Integração com pipeline parallelism + thermal
+
+### 8.3 ARM CCA nativo
+- [ ] `cca-attestation.ts`: Remote Attestation via ARM CCA Realm
+- [ ] CCA provider para TeeBridge (SGX/SEV/CCA)
+- [ ] Integração com tee-attestation-layer
+- [ ] Testes: quote/verify para Realm, measurement hash
+
+## Sprint 9: Verifiable FL + Fallback Extremo
+
+### 9.1 zk-SNARKs FL verificável
+- [ ] `zk-fl-verifier.ts`: Verificação SNARK de updates FL
+- [ ] `zk-fl-prover.ts`: Prova de computação correta no cliente
+- [ ] Integração com FedYogi + FEDADAVR
+- [ ] Testes: proof generation, verification, batch verify
+
+### 9.2 LoRaWAN + Acústica Ultrassónica (ADR-015)
+- [ ] `lora-crdt-sync.ts`: Sync CRDT via LoRaWAN (baixa largura de banda)
+- [ ] `acoustic-crdt-sync.ts`: Sync CRDT via ultrassom (dispositivos próximos)
+- [ ] Router de transporte opportunistic (LoRa ↔ acústica ↔ IP)
+- [ ] Integração com CrdtSync + FailoverManager
+- [ ] Testes: sync com perda de pacotes, fallback automático
+
+## Sprint 10: Integração + Beta
+
+### 10.1 Integração + Qualidade
+- [ ] Integrar todos os 8 + novos pacotes
+- [ ] Testes de carga (100+ nós simulados)
 - [ ] Stress test 30+ min, auditoria segurança, otimização bateria
+- [ ] E2E: speculative decoding + semantic routing + thermal → mobile → PC → cloud
 
-### 7.2 Beta
+### 10.2 Beta
 - [ ] Beta fechado (20 empresas, 500 dispositivos)
 - [ ] Dashboard, documentação API
-
----
-
-## Backlog Técnico
-
-- [ ] iOS (CoreML via ExecuTorch)
-- [ ] Smart TVs (PWA + WebGPU)
-- [ ] ARM CCA nativo
-- [ ] zk-SNARKs FL verificável
-- [ ] Multi-chain (Polygon, Arbitrum)
-- [ ] Plugin system para modelos customizados
-- [ ] LoRaWAN + acústica ultrassónica (ADR-015)
-- [ ] Circadian-Aware Scheduling (ADR-014)
+- [ ] Beta público instalável (app stores + PWA)
 
 ---
 
@@ -156,11 +198,6 @@
 - **Agent Query UI:** modo Agente no page.tsx com task list + autonomy selector
 - **WASM:** 178KB, JS glue 35KB
 
-### Sprint 5.3 (Julho 2026) ✅
-- **useSkynet real:** Hook integrado com AgentRuntime + AgentHost + AgentModel + SolanaX402 reais
-- **App UI tests:** 6 testes de tipos + infra vitest no app-ui-orchestrator
-- **next.config.js:** transpilePackages atualizado para incluir inference-runtime + blockchain-client
-
 ### Sprint 5 (Junho 2026)
 - **AttestationManager:** SGX simulation com quote/verify, SHA-256 measurement, nonce challenge-response, hardware signature mode, 9 testes
 - **TeeBridge:** Deteção automática TEE (x64→SGX, WebGPU→CCA, Tauri→SEV), secure execution com fallback, validação memória/providers, 6 testes
@@ -174,10 +211,16 @@
 - **ClientSelection:** Heterogeneous client selection (bateria, Wi-Fi, thermal, memory, reliability), 6 testes
 - **19 testes novos**, 273 tests totais, 17/17 tasks
 
+### Sprint 7 (Julho 2026)
+- **Circadian Scheduler:** Scheduler que segue terminador terrestre, scores sazonais (12 testes)
+- **Plugin System:** PluginSchema + PluginRegistry + PluginLoader, HuggingFace/ONNX/URL, 16 testes
+- **Multi-chain:** PolygonAdapter + ArbitrumAdapter + MultiChainRouter, 12 testes
+- **40 testes novos**, 313 tests totais, 16/16 tasks
+
 ### Resultados Acumulados
 - **8/8 packages build OK** via `pnpm build` (Turborepo v2.9.16)
-- **273 testes** passando (41 core-wasm-engine + 35 blockchain-client + 7 inference-runtime + 16 desktop-node-agent + 125 p2p-mesh-network + 24 tee-attestation-layer + 6 app-ui-orchestrator + 19 fl-training-client)
-- **17/17 tasks** successful em `pnpm test`
+- **313 testes** passando (41 core-wasm-engine + 47 blockchain-client + 23 inference-runtime + 16 desktop-node-agent + 137 p2p-mesh-network + 24 tee-attestation-layer + 6 app-ui-orchestrator + 19 fl-training-client)
+- **16/16 tasks** successful em `pnpm test`
 - **WASM**: 178KB, JS glue 35KB, types 9KB
 - **Agent Runtime**: Rust WASM + TS stub + AGENT_TEMPLATES
 - **Agent Host**: desktop-node-agent com 9 builtin tools, spawn/execute/stop

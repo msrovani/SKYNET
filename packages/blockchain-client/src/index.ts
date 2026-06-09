@@ -27,3 +27,12 @@ export {
   type AgentPaymentConfig,
   type AgentPaymentQuote,
 } from './agent-payments.js';
+export {
+  PolygonAdapter, ArbitrumAdapter,
+  type ChainConfig, type ChainQuote, type ChainReceipt,
+} from './chain-adapters.js';
+export {
+  MultiChainRouter,
+  type ChainRoute, type RoutingConfig,
+  type RouterEvent, type RouterEventType, type RouterCallback,
+} from './multi-chain-router.js';

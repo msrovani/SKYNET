@@ -26,6 +26,10 @@ export {
   type SchedulerParams, type DeviceClass, type ThermalCallback,
 } from './thermal.js';
 export {
+  CircadianScheduler, type CircadianPeer, type CircadianScore,
+  type CircadianConfig,
+} from './circadian-scheduler.js';
+export {
   SpeculativeDecoder,
   type SpeculativeConfig,
   type SpeculativeStats,

@@ -24,3 +24,15 @@ export {
 } from './model-loader.js';
 
 export { AgentModel, type AgentModelConfig, type ToolAdapter, type AgentTurnResult } from './agent-model.js';
+export {
+  PluginRegistry, type RegistryEvent, type RegistryEventType, type RegistryCallback,
+} from './plugin-registry.js';
+export {
+  PluginLoader, type PluginLoadResult, type PluginLoadProgress, type PluginLoadCallback,
+} from './plugin-loader.js';
+export {
+  validatePluginCard, computeSimpleChecksum,
+  type ModelPluginCard, type PluginSchema, type PluginAuthor,
+  type PluginValidation, type PluginManifest, type PluginEntry,
+  type PluginSource, type PluginRuntime, type PluginArchitecture,
+} from './plugin-types.js';
