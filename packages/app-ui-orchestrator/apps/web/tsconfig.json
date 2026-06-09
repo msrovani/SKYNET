@@ -8,7 +8,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": ".next",
-    "rootDir": ".",
+    "rootDir": "../../",
     "baseUrl": ".",
     "paths": {
       "@/*": [
@@ -32,13 +32,16 @@
     ]
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
     "next-env.d.ts",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "../../shared/**/*.ts",
+    "../../shared/**/*.tsx"
   ],
   "exclude": [
     "node_modules",
-    ".next"
+    ".next",
+    "../../node_modules"
   ]
 }

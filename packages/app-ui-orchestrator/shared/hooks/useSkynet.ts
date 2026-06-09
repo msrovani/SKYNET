@@ -5,7 +5,7 @@ import { SolanaX402, MicroTxManager } from '@skynet/blockchain-client';
 import {
   AppState, AiMode, AgentAutonomy, MeshStatus, SilentConfig,
   AgentTask, AI_MODE_LABELS,
-} from '../types/index.js';
+} from '../types/index';
 
 const DEFAULT_APP: AppState = {
   mode: AiMode.LIGHTNING,

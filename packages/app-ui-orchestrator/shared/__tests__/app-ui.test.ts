@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AiMode, AgentAutonomy, AI_MODE_LABELS, AI_MODE_ICONS, AGENT_AUTONOMY_LABELS } from '../types/index.js';
+import { AiMode, AgentAutonomy, AI_MODE_LABELS, AI_MODE_ICONS, AGENT_AUTONOMY_LABELS } from '../types/index';
 
 describe('App UI Types', () => {
   it('has all AI modes', () => {

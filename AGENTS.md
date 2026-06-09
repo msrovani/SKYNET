@@ -48,9 +48,10 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 18. Planner é um Agente (não módulo fixo) — evolui via EvolutionEngine tal como outros agentes
 19. Topologia Híbrida (τX) como Default — paralelo dentro de layers, sequencial entre layers
 
-## Estado Atual (Sprint 9.2 ✅ — Stub-to-Real Hardening + Word-Level Embeddings: Release v0.8.2)
+## Estado Atual (Sprint 10 ✅ — Integração + Beta: Release v0.9.0)
 - **Build 8/8 packages** OK via `pnpm build` (Turborepo v2.9.16)
-- **pnpm test**: 16/16 tasks, **390 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 16 desktop-node-agent + 167 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 32 fl-training-client)
+- **pnpm test**: 16/16 tasks, **395 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 21 desktop-node-agent + 167 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 32 fl-training-client)
+- **App UI web build**: compila e exporta com sucesso (`build:web`)
 - **WASM**: 178KB. JS glue: 35KB. Types: 9KB.
 - **Stub-to-Real Hardening**: 6 stubs/placeholders substituídos por implementações reais:
   - `transport.ts:send()` — message buffer + peer dispatch (antes: corpo vazio)

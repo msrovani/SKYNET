@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { useSkynet } from '../../../../shared/hooks/useSkynet.js';
-import { AiMode, AgentAutonomy, AI_MODE_LABELS, AI_MODE_ICONS } from '../../../../shared/types/index.js';
+import { useSkynet } from '../../../../shared/hooks/useSkynet';
+import { AiMode, AgentAutonomy, AI_MODE_LABELS, AI_MODE_ICONS } from '../../../../shared/types/index';
 
 const MODES: { key: AiMode; icon: string; label: string; desc: string }[] = [
   { key: AiMode.LIGHTNING, icon: '⚡', label: 'Relâmpago', desc: 'Respostas instantâneas' },
@@ -113,7 +113,7 @@ export default function Home() {
                 <div style={{ flex: 1 }}>
                   <span style={{ color: '#ddd' }}>{t.description}</span>
                   <div style={{
-                    height: 3, background: '#333', borderRadius: 2, marginTop: 4,
+                    height: 3, borderRadius: 2, marginTop: 4,
                     width: `${t.progress * 100}%`, background: '#00ff88',
                   }} />
                 </div>

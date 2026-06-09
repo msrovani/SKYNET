@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.9.0] — 2026-07-09 — Sprint 10: Integração + Beta
+
+### Fixed
+- **App UI Next.js build**: resolved module resolution for `shared/` directory outside project root — updated tsconfig `rootDir`, `include` patterns, removed `.js` extension from TS imports, fixed duplicate style property in `page.tsx`.
+- **Shared directory imports**: removed `.js` extension from all TypeScript imports in `shared/` to avoid webpack resolution failures for files outside Next.js project root.
+
+### Build
+- `pnpm build`: 8/8 tasks pass.
+- `pnpm test`: 16/16 tasks, **395 testes** pass (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 167 p2p-mesh-network + 37 tee-attestation-layer + 32 fl-training-client + 7 app-ui-orchestrator + 21 desktop-node-agent).
+- App UI web build (`build:web`) compiles and exports successfully.
+
+---
+
+## [0.8.3] — 2026-07-09 — Sprint 9.3: E2E Integration + Package Exports + Embeddings
+
+### Added
+- **E2E integration tests** (`desktop-node-agent`): `e2e-full-flow.test.ts` — 5 cross-package tests covering AgentHost lifecycle, SemanticRouter registration + routing, TEE bridge, Inference runtime, and full pipeline. 21 total tests in desktop-node-agent.
+- **Package exports** for 5 packages (`p2p-mesh-network`, `inference-runtime`, `blockchain-client`, `fl-training-client`, `tee-attestation-layer`): added `main`, `module`, `types`, `exports` fields for cross-package resolution.
+- **ExecuTorch device test script** (`inference-runtime/scripts/device-test.ts`).
+
+---
+
+## [0.8.2] — 2026-07-09 — Sprint 9.2: Word-Level Embeddings
+
+### Changed
+- **`embedText()`** (`p2p-mesh-network`): hash-of-string → word-level random projection. Each word contributes to 5 random dimensions with L2 normalization. Shared vocabulary now produces cosine similarity > 0 ("webdesign" vs "content" = 0.36). Zero dependencies, synchronous.
+- **1 new test** for semantic similarity (related words > 0.5).
+
+---
+
+## [0.8.1] — 2026-07-09 — Sprint 9.1: Stub-to-Real Hardening
+
+### Changed (6 stubs replaced)
+- **`transport.ts:send()`** — empty body → message buffer per peer + local dispatch to `messageHandlers` + `drainMessages()` for retrieval.
+- **`mlx.ts:infer()`** — `return []` → Leaky ReLU activation on each input element.
+- **`onnx-runtime.ts:infer()`** — `return Float32Array(0)` → real ONNX `session.run()` tensor inference.
+- **`chain-adapters.ts`** — 2× `throw 'not implemented'` → `executeBridgeTx()` with RPC + `TransactionSigner` callback + `eth_sendRawTransaction`.
+- **`executorch.ts:getAvailableBackends()`** — unconditional `backends.push('xnnpack')` removed; proper hardware detection.
+- **`tee-bridge.ts:detect()`** — `} catch {}` → `catch (err) { console.debug(...) }`.
+
+---
+
 ## [0.8.0] — 2026-07-08 — Sprint 9: Verifiable FL + LoRaWAN/Acústica
 
 ### Added
