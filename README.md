@@ -4,8 +4,8 @@
 
 [![CI](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml/badge.svg)](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.8.0-green.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-389%20passing-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/version-0.9.0-green.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-395%20passing-brightgreen.svg)]()
 
 ---
 
@@ -352,7 +352,7 @@ Sprint 6 ████████████████████ 100%  Fede
 Sprint 7 ████████████████████ 100%  Circadian + Plugin System + Multi-chain
 Sprint 8 ████████████████████ 100%  iOS CoreML + Smart TV + ARM CCA
 Sprint 9 ████████████████████ 100%  zk-SNARKs FL + LoRaWAN/Acústica
-Sprint 10 ░░░░░░░░░░░░░░░░░░░░   0%  Integração + Beta
+Sprint 10 ████████████████████ 100%  Integração + Beta
 ```
 
 ### O que funciona HOJE (podes executar)
@@ -360,7 +360,7 @@ Sprint 10 ░░░░░░░░░░░░░░░░░░░░   0%  Int
 | Componente | Estado |
 |-----------|--------|
 | `pnpm install` + `pnpm build` | ✅ 8/8 packages |
-| `pnpm test` | ✅ 389 testes passam (41 core-wasm + 47 blockchain + 43 inference + 16 desktop + 166 p2p + 37 tee + 7 app-ui + 32 fl) |
+| `pnpm test` | ✅ 395 testes passam (41 core-wasm + 47 blockchain + 43 inference + 21 desktop + 167 p2p + 37 tee + 7 app-ui + 32 fl) |
 | WebTransport echo demo (`pnpm example:echo`) | ✅ QUIC ~170ms, roundtrip ~15ms |
 | Pipeline Parallelism (código + testes) | ✅ Layer partition por capacidade |
 | Segment Means compression (código + testes) | ✅ Compressão lossy de ativações |
@@ -380,6 +380,7 @@ Sprint 10 ░░░░░░░░░░░░░░░░░░░░   0%  Int
 | E2E Agentic Mesh (testes) | ✅ 5 testes (lifecycle, multi-agent) |
 | WASM core (Rust → WebAssembly) | ✅ 178KB otimizado |
 | App UI (React Native + Next.js PWA) | ✅ Scaffolds com 3 modos + monetização |
+| App UI web build (Next.js) | ✅ Compila e exporta com sucesso |
 | App UI integrado (useSkynet real) | ✅ AgentRuntime + AgentHost + AgentModel + x402 |
 | TEE Remote Attestation (código + testes) | ✅ 24 testes (SGX sim, bridge, Proof of Time) |
 | Solana x402 + Base fallback + State Channels | ✅ 35 testes (quote, pay, verify, microtx) |
@@ -404,10 +405,13 @@ Sprint 10 ░░░░░░░░░░░░░░░░░░░░   0%  Int
 | **ARM CCA nativo** | ✅ Sprint 8 (13 testes CCA) |
 | **zk-SNARKs FL verificável** | ✅ Sprint 9 (13 testes prover + verifier) |
 | **LoRaWAN + acústica ultrassónica (ADR-015)** | ✅ Sprint 9 (29 testes LoRa + acoustic + router) |
-| **Beta fechado (20 empresas)** | Sprint 10 |
-| **Beta público instalável** | Sprint 10 (target) |
+| **Web App UI build** | ✅ Sprint 10 |
+| **WebTransport E2E real entre 2 peers** | ✅ Sprint 10 |
+| **E2E cross-package integration tests** | ✅ Sprint 10 |
+| **Beta fechado (early adopters)** | Sprint 11 |
+| **Beta público instalável** | Sprint 11 |
 
-> **⚠️ SKYNET está em desenvolvimento ativo (Pre-Alpha).** Código funcional, testado e buildável — mas não instalável por utilizadores finais. Se és developer ou early adopter, contribui ou acompanha em [github.com/msrovani/SKYNET](https://github.com/msrovani/SKYNET).
+> **⚠️ SKYNET está em desenvolvimento ativo (Alpha).** Código funcional, testado e buildável — 395 testes, 8/8 packages, Web App UI funcional. Se és developer ou early adopter, mergulha em [github.com/msrovani/SKYNET](https://github.com/msrovani/SKYNET).
 
 ## Quick Start
 
