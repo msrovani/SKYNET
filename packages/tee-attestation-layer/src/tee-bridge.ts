@@ -82,6 +82,21 @@ export class TeeBridge {
       }
     } catch {}
 
+    if (typeof process !== 'undefined') {
+      const arch: string = process.arch;
+      if (arch === 'arm64' || arch === 'aarch64') {
+        return {
+          available: true,
+          type: 'cca',
+          gpuSupport: true,
+          maxMemoryMb: 1024,
+          attestationSupported: true,
+          secureStorage: true,
+          version: '1.0',
+        };
+      }
+    }
+
     return {
       available: false,
       type: 'none',

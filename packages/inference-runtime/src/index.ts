@@ -36,3 +36,17 @@ export {
   type PluginValidation, type PluginManifest, type PluginEntry,
   type PluginSource, type PluginRuntime, type PluginArchitecture,
 } from './plugin-types.js';
+
+export {
+  CoreMLRuntime, detectPlatform, recommendDelegate,
+  type CoreMLConfig, type CoreMLDelegate,
+  type CoreMLMetadata, type CoreMLInferenceResult,
+  type CoreMLPlatform,
+} from './coreml.js';
+
+export {
+  WebGpuPreprocessor, isWebGpuAvailable, getWebGpuAdapter,
+  getAdapterInfo, getTvAdapterInfo,
+  type WebGpuShaderConfig, type ShaderType,
+  type WebGpuAdapterInfo, type PreprocessResult,
+} from './webgpu-preprocess.js';

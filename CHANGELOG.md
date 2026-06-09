@@ -1,6 +1,19 @@
 # Changelog
 
-## [0.6.0] — 2026-07-08 — Sprint 7: Circadian + Plugins + Multi-chain
+## [0.7.0] — 2026-07-08 — Sprint 8: iOS CoreML + Smart TV + ARM CCA
+
+### Added
+- **iOS CoreML** (`inference-runtime`): `CoreMLRuntime` — delegate ANE/GPU/CPU, `detectPlatform()`, `recommendDelegate()` por chip (M4/A18/A17), `optimizeForModel()` por parâmetros, `checkANEAvailability()`. 12 testes.
+- **WebGPU Preprocess** (`inference-runtime`): `WebGpuPreprocessor` — shaders ESPCN/ESRGAN/Normalize/Resize/Layout, `getAdapterInfo()`, `getTvAdapterInfo()`, `isWebGpuAvailable()`. 8 testes.
+- **PVA TV Adaptive** (`app-ui-orchestrator`): `useTvPlatform()` hook — deteção Tizen/webOS/Android TV/Roku, input remote/touch/teclado, WebGPU check.
+- **ARM CCA Attestation** (`tee-attestation-layer`): `CcaAttestation` — Realm lifecycle (initialize/attest/verifyReport/destroyRealm/transitionRealm), SHA-256 measurement hash, nonce challenge-response, platform evidence. 13 testes.
+- **TeeBridge CCA detection**: ARM64/aarch64 detection added to `TeeBridge.detect()`.
+
+### Tests
+- **347 total** (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 16 desktop-node-agent + 137 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 19 fl-training-client).
+- 16/16 tasks pass via `pnpm test`.
+
+---
 
 ### Added
 - **Circadian-Aware Scheduling** (`p2p-mesh-network`): `CircadianScheduler` — segue o terminador terrestre, scores sazonais, integração com ThermalManager + DynamicShifter. 12 testes.

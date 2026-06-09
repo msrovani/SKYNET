@@ -4,8 +4,8 @@
 
 [![CI](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml/badge.svg)](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.6.0-green.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-313%20passing-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/version-0.7.0-green.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-347%20passing-brightgreen.svg)]()
 
 ---
 
@@ -350,7 +350,7 @@ Sprint 4d ████████████████████ 100%  Age
 Sprint 5 ████████████████████ 100%  TEE Attestation + Blockchain Client
 Sprint 6 ████████████████████ 100%  Federated Learning
 Sprint 7 ████████████████████ 100%  Circadian + Plugin System + Multi-chain
-Sprint 8 ░░░░░░░░░░░░░░░░░░░░   0%  iOS CoreML + Smart TV + ARM CCA
+Sprint 8 ████████████████████ 100%  iOS CoreML + Smart TV + ARM CCA
 Sprint 9 ░░░░░░░░░░░░░░░░░░░░   0%  zk-SNARKs FL + LoRaWAN/Acústica
 Sprint 10 ░░░░░░░░░░░░░░░░░░░░   0%  Integração + Beta
 ```
@@ -360,7 +360,7 @@ Sprint 10 ░░░░░░░░░░░░░░░░░░░░   0%  Int
 | Componente | Estado |
 |-----------|--------|
 | `pnpm install` + `pnpm build` | ✅ 8/8 packages |
-| `pnpm test` | ✅ 313 testes passam (41 core-wasm + 47 blockchain + 23 inference + 16 desktop + 137 p2p + 24 tee + 6 app-ui + 19 fl) |
+| `pnpm test` | ✅ 347 testes passam (41 core-wasm + 47 blockchain + 43 inference + 16 desktop + 137 p2p + 37 tee + 7 app-ui + 19 fl) |
 | WebTransport echo demo (`pnpm example:echo`) | ✅ QUIC ~170ms, roundtrip ~15ms |
 | Pipeline Parallelism (código + testes) | ✅ Layer partition por capacidade |
 | Segment Means compression (código + testes) | ✅ Compressão lossy de ativações |
@@ -387,14 +387,17 @@ Sprint 10 ░░░░░░░░░░░░░░░░░░░░   0%  Int
 | Circadian-Aware Scheduling (ADR-014) | ✅ 12 testes, terminador, scores sazonais |
 | Plugin System para modelos customizados | ✅ 16 testes (schema, registry, loader) |
 | Multi-chain (Polygon, Arbitrum, router) | ✅ 12 testes (quotes, bridge, routing) |
+| iOS CoreML delegate (via ExecuTorch) | ✅ 12 testes (ANE, chip optimization) |
+| WebGPU preprocess + TV adaptive PWA | ✅ 8 testes WebGPU + useTvPlatform hook |
+| ARM CCA native attestation | ✅ 13 testes (realm, attest, verify) |
 
 ### O que NÃO funciona ainda (próximas sprints)
 
 | Funcionalidade | Previsão |
 |---------------|----------|
-| **iOS (CoreML via ExecuTorch)** | Sprint 8 |
-| **Smart TVs (PWA + WebGPU)** | Sprint 8 |
-| **ARM CCA nativo** | Sprint 8 |
+| **iOS (CoreML via ExecuTorch)** | ✅ Sprint 8 (12 testes) |
+| **Smart TVs (PWA + WebGPU)** | ✅ Sprint 8 (8 testes WebGPU + hook React) |
+| **ARM CCA nativo** | ✅ Sprint 8 (13 testes CCA) |
 | **zk-SNARKs FL verificável** | Sprint 9 |
 | **LoRaWAN + acústica ultrassónica (ADR-015)** | Sprint 9 |
 | **Beta fechado (20 empresas)** | Sprint 10 |

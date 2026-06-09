@@ -39,3 +39,11 @@ describe('useSkynet interface', () => {
     });
   });
 });
+
+describe('useTvPlatform types', () => {
+  it('imports useTvPlatform without error', async () => {
+    const mod = await import('../hooks/useTvPlatform.js');
+    expect(typeof mod.useTvPlatform).toBe('function');
+    expect(mod.useTvPlatform.length).toBe(0);
+  });
+});

@@ -48,9 +48,9 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 18. Planner é um Agente (não módulo fixo) — evolui via EvolutionEngine tal como outros agentes
 19. Topologia Híbrida (τX) como Default — paralelo dentro de layers, sequencial entre layers
 
-## Estado Atual (Sprint 7 ✅ — Circadian + Plugins + Multi-chain: Release v0.6.0)
+## Estado Atual (Sprint 8 ✅ — iOS CoreML + Smart TV + ARM CCA: Release v0.7.0)
 - **Build 8/8 packages OK** via `pnpm build` (Turborepo v2.9.16)
-- **pnpm test**: 16/16 tasks, **313 testes** passando (41 core-wasm-engine + 47 blockchain-client + 23 inference-runtime + 16 desktop-node-agent + 137 p2p-mesh-network + 24 tee-attestation-layer + 6 app-ui-orchestrator + 19 fl-training-client)
+- **pnpm test**: 16/16 tasks, **347 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 16 desktop-node-agent + 137 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 19 fl-training-client)
 - **WASM**: 178KB. JS glue: 35KB. Types: 9KB.
 - **Agent Runtime** (`agent_runtime.rs`): Struct Rust com AgentConfig, AgentInput/Output, ToolCall, ciclo de vida (Idle→Loading→Ready→Executing→Completed). `AgentRuntime` class TS com `load()`/`execute()`/`reset()`. 12 testes.
 - **Agent Templates** (`AGENT_TEMPLATES`): 3 templates pré-definidos — `webdesign` (qwen-2.5-7b-int4), `content-writer` (llama-3.2-3b), `image-optimizer` (flux-1-dev). Factory `createAgentFromTemplate()`.

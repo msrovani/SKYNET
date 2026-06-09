@@ -21,3 +21,9 @@ export {
   type ProofResult,
   type WorkChunk,
 } from './proof-of-time.js';
+
+export {
+  CcaAttestation, isCcaAvailable,
+  type CcaConfig, type CcaRealmInfo, type CcaRealmState,
+  type CcaAttestationReport, type CcaVerificationResult,
+} from './cca-attestation.js';
