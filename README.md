@@ -413,22 +413,36 @@ Sprint 10 ████████████████████ 100%  Int
 
 > **⚠️ SKYNET está em desenvolvimento ativo (Alpha).** Código funcional, testado e buildável — 395 testes, 8/8 packages, Web App UI funcional. Se és developer ou early adopter, mergulha em [github.com/msrovani/SKYNET](https://github.com/msrovani/SKYNET).
 
-## Quick Start
+## Quick Start (cross-platform)
+
+**Pré-requisitos**: Node.js ≥20, pnpm ≥9, Git.
 
 ```bash
-# Instalar dependências
+# 1. Clonar
+git clone https://github.com/msrovani/SKYNET.git
+cd SKYNET
+
+# 2. Instalar + Build + Test
 pnpm install
+pnpm build       # 8/8 packages (fallback automático se Rust ausente)
+pnpm test        # 395 testes, 16/16 tasks
 
-# Build todos os pacotes
-pnpm build
-
-# Correr testes
-pnpm test
-
-# WebTransport echo demo (Hello World)
+# 3. WebTransport echo demo
 pnpm --filter @skynet/p2p-mesh-network example:setup
 pnpm --filter @skynet/p2p-mesh-network example:echo
+# → Connected in ~120ms, Echo in ~3ms
+
+# 4. App UI Web (Next.js)
+pnpm --filter @skynet/app-ui-orchestrator build:web
 ```
+
+| Plataforma | Node.js | Build tools (opcionais) |
+|------------|---------|------------------------|
+| **Windows** | `nvm install 20` | Visual Studio Build Tools |
+| **macOS** | `fnm install 20` | `xcode-select --install` |
+| **Linux** | `fnm install 20` | `apt install build-essential pkg-config libssl-dev` |
+
+> Guia completo de instalação cross-platform em [`docs/BETA_GUIDE.md`](docs/BETA_GUIDE.md).
 
 ## Repositório
 
