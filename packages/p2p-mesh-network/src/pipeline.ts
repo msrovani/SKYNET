@@ -163,6 +163,7 @@ export class PipelineManager {
     );
     if (remainingPeers.length === 0) return;
     const newAssignment = this.createPartition(remainingPeers);
+    this.assignment = newAssignment;
     this.emit({ type: 'pipeline-reconfigured', data: newAssignment });
   }
 

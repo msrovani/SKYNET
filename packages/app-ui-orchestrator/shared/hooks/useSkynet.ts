@@ -89,7 +89,7 @@ export function useSkynet() {
     switch (appState.mode) {
       case AiMode.LIGHTNING: {
         const agent = createAgentFromTemplate('content-writer', 'lightning-agent');
-        agent.load();
+        await agent.load();
         const output = agent.execute({ prompt, context: [] });
         setResponse(`⚡ ${output.content}`);
         break;
@@ -141,7 +141,7 @@ export function useSkynet() {
         // Step 2: Webdesign agent
         updateTask('1', { status: 'executing', progress: 0.3 });
         const webAgent = createAgentFromTemplate('webdesign', 'web-agent');
-        webAgent.load();
+        await webAgent.load();
         const webOut = webAgent.execute({ prompt, context: [] });
         updateTask('1', { status: 'completed', progress: 1 });
         webAgent.reset();
@@ -149,7 +149,7 @@ export function useSkynet() {
         // Step 3: Content agent
         updateTask('2', { status: 'executing', progress: 0.3 });
         const contentAgent = createAgentFromTemplate('content-writer', 'content-agent');
-        contentAgent.load();
+        await contentAgent.load();
         const contentOut = contentAgent.execute({ prompt, context: [] });
         updateTask('2', { status: 'completed', progress: 1 });
         contentAgent.reset();

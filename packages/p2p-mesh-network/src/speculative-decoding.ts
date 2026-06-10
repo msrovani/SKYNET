@@ -184,7 +184,7 @@ export class SpeculativeDecoder {
     if (!this.pipeline) return 'drafter';
     const stage = this.pipeline.getStageForPeer(peerId);
     if (!stage) return 'drafter';
-    return stage.stageIndex === 0 ? 'verifier' : 'drafter';
+    return stage.stageIndex === 0 ? 'drafter' : 'verifier';
   }
 
   getStats(): SpeculativeStats {

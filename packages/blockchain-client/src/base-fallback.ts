@@ -55,7 +55,8 @@ export class BaseFallback {
 
   get rpcUrl(): string { return this.config.rpcUrl; }
 
-  async sendTransaction(tx: Record<string, unknown>): Promise<string> {
+  async sendTransaction(signedTxHex: string): Promise<string> {
+    if (!signedTxHex.startsWith('0x')) signedTxHex = '0x' + signedTxHex;
     const response = await fetch(this.config.rpcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -63,7 +64,7 @@ export class BaseFallback {
         jsonrpc: '2.0',
         id: 1,
         method: 'eth_sendRawTransaction',
-        params: [tx],
+        params: [signedTxHex],
       }),
     });
     const result = await response.json() as any;

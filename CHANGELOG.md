@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.9.1] — 2026-07-09 — Sprint 11: Bug Hunting + Hardening
+
+### HIGH — Runtime crashes / data loss (6 TS + 2 Rust)
+
+- **ONNX Runtime Tensor API** (`inference-runtime/src/onnx-runtime.ts`): `new this.session.Tensor()` → `new Tensor()` — Tensor é importado do módulo `ort`, não é propriedade de `session`. Causava crash ao inferir.
+- **Agent Model tokenization** (`inference-runtime/src/agent-model.ts`): `fullPrompt.split('').map(c => c.charCodeAt(0))` gerava >10k floats (character-level). Substituído por `simpleTokenize()` word-level hash-based.
+- **FedYogi update rule** (`fl-training-client/src/fed-yogi.ts`): Implementação incorreta `v = β₂·v − (1−β₂)·sign(...)·g²` → corrigido para `v -= (1−β₂)·sign(...)·g²` (Yogi paper). Optimizer não convergia.
+- **Solana x402 signers vazios** (`blockchain-client/src/solana-x402.ts`): `[]` array vazio como signers → Keypair derivado do config private key. `null as any` em `getFeeForMessage` → `getLatestBlockhash()` com fee estimado.
+- **Base fallback argumento errado** (`blockchain-client/src/base-fallback.ts`): `eth_sendRawTransaction` recebia `Record<string, unknown>` em vez de `string` hex.
+- **Transport send sem write** (`p2p-mesh-network/src/transport.ts`): `send()` bufferizava localmente mas nunca escrevia ao WebTransport datagrams. Dados perdidos na mesh.
+- **Rust division-by-zero** (`core-wasm-engine/src/inference.rs`, `tensor.rs`): `build_pipeline_plan` crashava com `host_ids` vazio. `quantize_int4` crashava com scale=0 se min==max.
+- **Rust assert! panics** (`core-wasm-engine/src/tensor.rs`): `shard_rowwise`/`shard_colwise` crashavam com inputs inválidos em vez de retornar vetor vazio.
+
+### MEDIUM — Logic / correctness (10+ files)
+
+- **Speculative decoding role inversion** (`p2p-mesh-network/src/speculative-decoding.ts`): stage 0 mapeado como 'verifier' em vez de 'drafter'. Pipeline specs invertido.
+- **Pipeline peer failure sem reassignment** (`p2p-mesh-network/src/pipeline.ts`): `createPartition()` chamado mas resultado descartado. Pipeline mantinha peer morto.
+- **Semantic router scan redundante** (`p2p-mesh-network/src/semantic-router.ts`): Loop O(n) extra removido — single pass com `map().sort().slice()`.
+- **Discovery localStorage em Node.js** (`p2p-mesh-network/src/discovery.ts`): `localStorage` não definido crashava em Node.js. Guard `typeof localStorage === 'undefined'` adicionado.
+- **Chain-adapters zero-address** (`blockchain-client/src/chain-adapters.ts`): Recipients sem prefixo `0x` geravam `0x0...0`. Fix: `replace(/^0x/, '')` incondicional.
+- **Agent payments dead code** (`blockchain-client/src/agent-payments.ts`): Ambos os ramos de `if (cost <= 1000)` chamavam mesma função. Unificado.
+- **useSkynet missing await** (`app-ui-orchestrator/shared/useSkynet.ts`): `agent.load()` sem `await`. Agentes nunca carregavam.
+- **build.cjs cross-platform** (`core-wasm-engine/build.cjs`): `copy`/`xcopy` + `C:\\Temp` → `fs.cpSync` + `os.tmpdir()` + `findWasmBindgen()` per-platform.
+- **CI wasm-bindgen** (`.github/workflows/ci.yml`): Download sempre Linux → `$RUNNER_OS` switch para linux/macos/windows. Missing `cache: pnpm`.
+- **Missing tsconfig** (`desktop-node-agent/tsconfig.json`): Criado com compilerOptions adequados.
+
+### Documentation
+- **BETA_GUIDE.md**: Cross-platform install guide com tabela de pré-requisitos por OS, troubleshooting section.
+
 ## [0.9.0] — 2026-07-09 — Sprint 10: Integração + Beta
 
 ### Fixed

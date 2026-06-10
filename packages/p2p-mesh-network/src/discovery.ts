@@ -43,6 +43,7 @@ export class PeerDiscovery {
   }
 
   private async discoverViaMDNS(): Promise<void> {
+    if (typeof localStorage === 'undefined') return;
     const localPeers = localStorage.getItem('skynet_known_peers');
     if (localPeers) {
       const peers: DiscoveredPeer[] = JSON.parse(localPeers);

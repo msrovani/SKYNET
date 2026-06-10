@@ -52,7 +52,7 @@ pub fn quantize_int4(weights: &[f32]) -> (Vec<u8>, Vec<f32>) {
     for chunk in weights.chunks(128) {
         let min = chunk.iter().cloned().fold(f32::INFINITY, f32::min);
         let max = chunk.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        let scale = (max - min) / 15.0;
+        let scale = if (max - min).abs() < 1e-10 { 1.0 } else { (max - min) / 15.0 };
         scales.push(min);
         scales.push(scale);
 
@@ -118,8 +118,7 @@ pub struct TensorShard {
 }
 
 pub fn shard_rowwise(tensor_id: &str, data: &[f32], rows: usize, cols: usize, num_shards: usize) -> Vec<TensorShard> {
-    assert!(data.len() == rows * cols, "Data length must match dimensions");
-    assert!(num_shards > 0 && num_shards <= rows, "num_shards must be between 1 and rows");
+    if data.len() != rows * cols || num_shards == 0 || num_shards > rows { return vec![]; }
 
     let rows_per_shard = (rows + num_shards - 1) / num_shards;
     let mut shards = Vec::with_capacity(num_shards);
@@ -159,8 +158,7 @@ pub fn shard_rowwise(tensor_id: &str, data: &[f32], rows: usize, cols: usize, nu
 }
 
 pub fn shard_colwise(tensor_id: &str, data: &[f32], rows: usize, cols: usize, num_shards: usize) -> Vec<TensorShard> {
-    assert!(data.len() == rows * cols, "Data length must match dimensions");
-    assert!(num_shards > 0 && num_shards <= cols, "num_shards must be between 1 and cols");
+    if data.len() != rows * cols || num_shards == 0 || num_shards > cols { return vec![]; }
 
     let cols_per_shard = (cols + num_shards - 1) / num_shards;
     let mut shards = Vec::with_capacity(num_shards);

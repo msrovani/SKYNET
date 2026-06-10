@@ -240,9 +240,8 @@ async function executeBridgeTx(
 
 function encodeBridgeData(recipient: string, amountWei: string): string {
   const methodSig = '0xac5f9c6f';
-  const recipientPad = recipient.startsWith('0x')
-    ? recipient.slice(2).padStart(64, '0')
-    : '0'.repeat(64);
+  const clean = recipient.replace(/^0x/, '');
+  const recipientPad = clean.padStart(64, '0');
   const amountPad = BigInt(amountWei).toString(16).padStart(64, '0');
   return methodSig + recipientPad + amountPad;
 }

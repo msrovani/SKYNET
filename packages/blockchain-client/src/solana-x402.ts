@@ -1,4 +1,4 @@
-import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Keypair } from '@solana/web3.js';
 
 export interface X402Config {
   endpoint?: string;
@@ -53,10 +53,11 @@ export interface ChannelState {
 export class SolanaX402 {
   private connection: Connection;
   private config: Required<X402Config>;
+  private signerSecretKey?: Uint8Array;
   private channels: Map<string, ChannelState> = new Map();
   private paymentNonce = 0;
 
-  constructor(config: X402Config = {}) {
+  constructor(config: X402Config & { signerSecretKey?: Uint8Array } = {}) {
     this.config = {
       endpoint: config.endpoint ?? 'https://api.mainnet-beta.solana.com',
       merchantWallet: config.merchantWallet ?? '',
@@ -64,6 +65,7 @@ export class SolanaX402 {
       maxRetries: config.maxRetries ?? 3,
       simulate: config.simulate ?? true,
     };
+    this.signerSecretKey = (config as any).signerSecretKey;
     this.connection = new Connection(this.config.endpoint);
   }
 
@@ -90,7 +92,9 @@ export class SolanaX402 {
     }
 
     if (!fromWallet) throw new Error('fromWallet required for real payments');
-    const fromPubkey = new PublicKey(fromWallet);
+    if (!this.signerSecretKey) throw new Error('signerSecretKey required in config for real payments');
+    const signer = Keypair.fromSecretKey(this.signerSecretKey);
+    const fromPubkey = signer.publicKey;
     const toPubkey = new PublicKey(quote.recipient);
 
     const tx = new Transaction().add(
@@ -101,7 +105,7 @@ export class SolanaX402 {
       }),
     );
 
-    const sig = await this.connection.sendTransaction(tx, []);
+    const sig = await this.connection.sendTransaction(tx, [signer]);
     const result = await this.confirmTransaction(sig);
 
     return {
@@ -212,8 +216,8 @@ export class SolanaX402 {
 
   private async estimateFee(): Promise<number> {
     try {
-      const fee = await this.connection.getFeeForMessage(null as any);
-      return (fee.value ?? 5000) * this.config.maxRetries;
+      const hash = await this.connection.getLatestBlockhash();
+      return 5000 * this.config.maxRetries;
     } catch {
       return 5000;
     }

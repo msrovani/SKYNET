@@ -1,11 +1,21 @@
 const { execSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const DIR = __dirname;
-const TMP = path.join(process.env.TEMP || 'C:\\Temp', 'skynet-wasm-build');
-const WBGEN_DIR = path.join(process.env.TEMP || 'C:\\Temp', 'wasm-bindgen');
-const WBGEN = path.join(WBGEN_DIR, 'wasm-bindgen-0.2.122-x86_64-pc-windows-msvc', 'wasm-bindgen.exe');
+const TMP = path.join(os.tmpdir(), 'skynet-wasm-build');
+const WBGEN_DIR = path.join(os.tmpdir(), 'wasm-bindgen');
+
+function findWasmBindgen() {
+  const platform = process.platform;
+  const arch = process.arch === 'x64' ? 'x86_64' : 'aarch64';
+  const osPart = platform === 'win32' ? 'pc-windows-msvc' : platform === 'darwin' ? 'apple-darwin' : 'unknown-linux-musl';
+  const dirName = `wasm-bindgen-0.2.122-${arch}-${osPart}`;
+  const exeName = platform === 'win32' ? 'wasm-bindgen.exe' : 'wasm-bindgen';
+  const p = path.join(WBGEN_DIR, dirName, exeName);
+  return fs.existsSync(p) ? p : null;
+}
 
 function buildWasm() {
   console.log('Cargo found, building WASM...');
@@ -14,11 +24,11 @@ function buildWasm() {
     fs.mkdirSync(TMP, { recursive: true });
   }
 
-  execSync(`copy "${DIR}\\Cargo.toml" "${TMP}\\"`, { stdio: 'pipe' });
-  execSync(`xcopy /E /Y /I "${DIR}\\src" "${TMP}\\src"`, { stdio: 'pipe' });
+  fs.cpSync(DIR + '/Cargo.toml', TMP + '/Cargo.toml', { force: true });
+  fs.cpSync(DIR + '/src', TMP + '/src', { recursive: true, force: true });
 
   const r = spawnSync('cargo', ['build', '--lib', '--release', '--target', 'wasm32-unknown-unknown'], {
-    cwd: TMP, stdio: 'inherit', shell: true,
+    cwd: TMP, stdio: 'inherit', shell: process.platform === 'win32',
   });
   if (r.status !== 0) {
     console.log('WASM build failed, falling back to TS stub');
@@ -30,17 +40,16 @@ function buildWasm() {
   const distDir = path.join(DIR, 'dist');
   if (!fs.existsSync(distDir)) fs.mkdirSync(distDir, { recursive: true });
 
-  // wasm-bindgen: use temp output dir to avoid accented path issues
-  if (fs.existsSync(WBGEN) && fs.existsSync(wasmSrc)) {
+  const wbgen = findWasmBindgen();
+  if (wbgen && fs.existsSync(wasmSrc)) {
     console.log('Running wasm-bindgen...');
-    const wbgOut = path.join(process.env.TEMP || 'C:\\Temp', 'skynet-wasm-bindgen-out');
+    const wbgOut = path.join(os.tmpdir(), 'skynet-wasm-bindgen-out');
     if (!fs.existsSync(wbgOut)) fs.mkdirSync(wbgOut, { recursive: true });
 
-    const wbg = spawnSync(WBGEN, [wasmSrc, '--out-dir', wbgOut, '--target', 'web'], {
+    const wbg = spawnSync(wbgen, [wasmSrc, '--out-dir', wbgOut, '--target', 'web'], {
       stdio: 'inherit',
     });
     if (wbg.status === 0) {
-      // Copy generated files to dist
       const files = fs.readdirSync(wbgOut);
       for (const f of files) {
         fs.copyFileSync(path.join(wbgOut, f), path.join(distDir, f));
@@ -65,7 +74,7 @@ function buildWasm() {
 
 function buildStub() {
   console.log('Building TypeScript stub...');
-  const r = spawnSync('pnpm', ['exec', 'tsc'], { stdio: 'inherit', cwd: DIR, shell: true });
+  const r = spawnSync('pnpm', ['exec', 'tsc'], { stdio: 'inherit', cwd: DIR, shell: process.platform === 'win32' });
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
 

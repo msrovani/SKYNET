@@ -9,9 +9,8 @@ describe('BaseFallback', () => {
   });
 
   it('sends raw transaction', async () => {
-    const mockTx = { data: '0x1234', to: '0x5678' };
     try {
-      await base.sendTransaction(mockTx);
+      await base.sendTransaction('0x1234');
     } catch (err: any) {
       expect(err.message).toContain('Base RPC error');
     }

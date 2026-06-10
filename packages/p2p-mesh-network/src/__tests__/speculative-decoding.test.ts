@@ -109,13 +109,13 @@ describe('SpeculativeDecoder', () => {
     const { SpeculativeDecoder } = await import('../speculative-decoding.js');
     const d = new SpeculativeDecoder();
     const mockGetStageForPeer = vi.fn((id: string) => {
-      if (id === 'verifier-peer') return { stageIndex: 0 } as any;
-      if (id === 'drafter-peer') return { stageIndex: 1 } as any;
+      if (id === 'drafter-peer') return { stageIndex: 0 } as any;
+      if (id === 'verifier-peer') return { stageIndex: 1 } as any;
       return undefined;
     });
     d.setPipeline({ getStageForPeer: mockGetStageForPeer } as any);
-    expect(d.getRoleForPeer('verifier-peer')).toBe('verifier');
     expect(d.getRoleForPeer('drafter-peer')).toBe('drafter');
+    expect(d.getRoleForPeer('verifier-peer')).toBe('verifier');
     expect(d.getRoleForPeer('unknown')).toBe('drafter');
   });
 

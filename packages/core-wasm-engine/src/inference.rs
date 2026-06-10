@@ -55,7 +55,7 @@ pub struct InferenceMemoryEstimate {
 }
 
 pub fn build_pipeline_plan(config: &TransformerConfig, host_ids: &[String]) -> PipelinePlan {
-    let num_hosts = host_ids.len();
+    let num_hosts = host_ids.len().max(1);
     let total_layers = config.num_layers;
     let mut layer_assignments = Vec::with_capacity(total_layers);
 
@@ -85,6 +85,10 @@ pub fn build_sharded_pipeline_plan(
     let num_hosts = host_ids.len();
     let total_layers = config.num_layers;
     let mut layer_assignments = Vec::with_capacity(total_layers * shards_per_layer);
+
+    if num_hosts == 0 || shards_per_layer == 0 {
+        return PipelinePlan { config: config.clone(), layer_assignments, num_hosts };
+    }
 
     for layer_idx in 0..total_layers {
         for s in 0..shards_per_layer {

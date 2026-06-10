@@ -46,10 +46,6 @@ export class AgentX402Payments {
   }
 
   async payTask(quote: AgentPaymentQuote, _userWallet: string): Promise<TxResult> {
-    if (quote.estimatedCost <= 1000) {
-      return this.microtx.payForInference(quote.taskId, quote.estimatedCost / 1e9);
-    }
-
     return this.microtx.payForInference(quote.taskId, quote.estimatedCost / 1e9);
   }
 

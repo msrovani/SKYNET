@@ -74,16 +74,6 @@ export class HnswIndex {
   search(query: Float32Array, k: number = 5): string[] {
     if (this.labels.length === 0) return [];
 
-    let best = this.labels[0];
-    let bestSim = -Infinity;
-    for (const [id, vec] of this.vectors) {
-      const sim = cosineSimilarity(query, vec);
-      if (sim > bestSim) {
-        bestSim = sim;
-        best = id;
-      }
-    }
-
     const candidates = this.labels
       .map(id => ({ id, sim: cosineSimilarity(query, this.vectors.get(id)!) }))
       .sort((a, b) => b.sim - a.sim);

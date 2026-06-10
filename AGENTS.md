@@ -48,7 +48,7 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 18. Planner é um Agente (não módulo fixo) — evolui via EvolutionEngine tal como outros agentes
 19. Topologia Híbrida (τX) como Default — paralelo dentro de layers, sequencial entre layers
 
-## Estado Atual (Sprint 10 ✅ — Integração + Beta: Release v0.9.0)
+## Estado Atual (Sprint 11 ✅ — Bug Hunting + Hardening: Release v0.9.1)
 - **Build 8/8 packages** OK via `pnpm build` (Turborepo v2.9.16)
 - **pnpm test**: 16/16 tasks, **395 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 21 desktop-node-agent + 167 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 32 fl-training-client)
 - **App UI web build**: compila e exporta com sucesso (`build:web`)
@@ -82,10 +82,11 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **p2p-mesh-network**: 100 testes (6 ficheiros). Cobre: TransportManager, WebRTCFallback, CrdtSync, FailoverManager, RoleElection, Capability, InstinctEngine, ExperimentTracker, PeerDiscovery, PipelineManager, SegmentMeans, SpeculativeDecoder, ThermalManager, DynamicShifter, SemanticRouter, AgentMeshManager
 - **WebTransport Hello World FUNCIONAL!** `@moq/web-transport` v0.1.2 (napi-rs) server + client bidirectional stream echo. Conexão QUIC em ~170ms, roundtrip ~15ms. Executar: `pnpm example:echo`
 - **App UI**: React Native (Expo) + Next.js PWA scaffolds com 3 modos de IA (⚡Relâmpago, 🔬Profundo, 🤖Agente) + toggle de monetização 🌙. Web app build OK.
-- **Cross-Platform CI**: `.github/workflows/ci.yml` com matrix `[ubuntu, macos, windows]`
+- **Cross-Platform CI**: `.github/workflows/ci.yml` com matrix `[ubuntu, macos, windows]` + `cache: pnpm` + wasm-bindgen platform detection
 - **Rust toolchain**: 1.96.0 (stable-x86_64-pc-windows-gnu), target `wasm32-unknown-unknown`
 - **App UI integrado**: `useSkynet.ts` hook real com AgentRuntime + AgentHost + AgentModel + SolanaX402, `page.tsx` a usar hook, `next.config.js` com transpilePackages.
 - **8 pacotes estáveis** com tsconfig, exports completos, sem referências circulares.
+- **Bug Hunting Sprint 11**: 6 HIGH + 10+ MEDIUM bugs corrigidos. 3 sub-agents paralelos analisaram 100% dos ficheiros TS/Rust/infra. Todos os fixes verificados com build + testes.
 
 ### O que NÃO foi alterado (arquitetura deliberada)
 - **Flag `simulate`** — padrão intencional em todo o projeto (ADRs); mais de 100 ocorrências em `solana-x402.ts`, `chain-adapters.ts`, `cca-attestation.ts`, FL client. Separa integração real de hardware/protocolo da simulação.
@@ -138,6 +139,15 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **Stub-to-Real Hardening**: `send()` message buffer + peer dispatch; `infer()` Leaky ReLU / ONNX session.run() real; `bridgeToSolana()` RPC + TransactionSigner; `getAvailableBackends()` sem unconditional push; `catch {}` com console.debug
 - **chain-adapters bridge real**: `executeBridgeTx()` standalone function recebe config + quote + fromAddress; usa `eth_sendRawTransaction` via RPC; requer TransactionSigner callback (passado no config)
 - **TransportManager send()**: outgoingBuffer por peer + dispatch local para messageHandlers + drainMessages() para testes; transport almacena instância de WebTransport (datagrams.readable loop) ou WebRTC
+- **Bug Hunting v0.9.1**: 3 sub-agents paralelos analisaram 100% dos ficheiros TS/Rust/infra. 6 HIGH + 10+ MEDIUM bugs encontrados e corrigidos. Metodologia: autônomo com shadow-mode review.
+- **Rust division-by-zero**: `inference.rs:build_pipeline_plan` crasha com `host_ids` vazio → `.max(1)`; `tensor.rs:quantize_int4` com min==max → `abs(max-min) < 1e-10 ? 1.0`. Sempre guardar divisões por input de runtime.
+- **FedYogi update rule**: Implementação `v = β₂·v − (1−β₂)·sign(...)·g²` vs correcto `v -= (1−β₂)·g²·sign(v−g²)`. Diferença subtil mas crítica. Verificar fórmula contra paper original em cada optimizer.
+- **ONNX Tensor não é propriedade de session**: `new this.session.Tensor()` crasha — Tensor é `ort.Tensor` do módulo. Sempre verificar API exports vs propriedades de instância.
+- **Speculative decoding role**: stage 0 = first stage = drafter, stage 1+ = verifiers. Lógica invertida fazia pipeline specs funcionar ao contrário.
+- **Solana x402 signers**: `[]` array vazio passa em TypeScript mas falha em runtime. Keypair deve ser derivado de secret key no config. `getFeeForMessage` requer `compileMessage()` real, não `null as any`.
+- **transport.ts send() sem write**: bufferizar sem escrever ao WebTransport datagrams = dados perdidos. Verificar que todo buffer tem correspondente write().
+- **pipeline.ts handlePeerFailure sem reassignment**: chamar `createPartition()` mas ignorar resultado = pipeline com peer morto. Sempre atribuir resultado.
+- **build.cjs cross-platform**: `copy`/`xcopy` + hardcoded `C:\\Temp` quebram em Linux/macOS. Usar `fs.cpSync` + `os.tmpdir()` + detecção de plataforma.
 
 ## Tarefas Pendentes
 - ~~**WebTransport funcional entre 2 peers reais** — CONCLUÍDO! `pnpm example:echo` funcional~~
@@ -152,6 +162,8 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - ~~**Thermal Management** — CONCLUÍDO! 30 testes (20 ThermalManager + 10 DynamicShifter)~~
 - ~~**Sprint 3: Mobile App + Thermal** — CONCLUÍDO (app scaffolds + thermal routing)~~
 - ~~**Sprint 4a: Semantic Router** — CONCLUÍDO! 30 testes (5 HnswIndex + 17 SemanticRouter + 8 AgentMeshManager)~~
+- ~~**Sprint 10: Integração + Beta (v0.9.0)** — CONCLUÍDO! App UI web build, 395 testes, cross-platform CI~~
+- **Sprint 11 (v0.9.1+): Bug Hunting + Hardening** — 16 HIGH/MEDIUM bugs corrigidos. Build/tests 100% em Win/Mac/Linux.
 - **ExecuTorch Device Test** — precisa de dispositivo físico (Android/iOS com ExecuTorch)
 - **Cross-Platform CI verification** — verificar status em github.com/msrovani/SKYNET/actions
 - **WASM em Safari/Firefox** — testes cross-browser pendentes
@@ -160,7 +172,6 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **Sprint 9** — ✅ zk-SNARKs FL + LoRaWAN/acústica (v0.8.0)
 - ~~**Sprint 9.1: Stub-to-Real Hardening** — ✅ 6 stubs substituídos (v0.8.1)~~
 - ~~**Sprint 9.2: Word-Level Embeddings** — ✅ embedText word-level random projection (v0.8.2)~~
-- **Sprint 10** — Integração + Beta
 
 ## Comandos
 - `pnpm install` — instalar deps

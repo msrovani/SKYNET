@@ -121,6 +121,14 @@ export class TransportManager {
     for (const handler of this.messageHandlers) {
       handler(data, peerId);
     }
+    if (this.connection?.datagrams?.writable) {
+      const writer = this.connection.datagrams.writable.getWriter();
+      try {
+        await writer.write(data);
+      } finally {
+        writer.releaseLock();
+      }
+    }
   }
 
   drainMessages(peerId: string): Uint8Array[] {

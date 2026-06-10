@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml/badge.svg)](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.9.0-green.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.9.1-green.svg)](CHANGELOG.md)
 [![Tests](https://img.shields.io/badge/tests-395%20passing-brightgreen.svg)]()
 
 ---

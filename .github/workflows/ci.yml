@@ -54,26 +54,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
       - name: Download wasm-bindgen-cli
         shell: bash
         run: |
-          mkdir -p "$TEMP/wasm-bindgen"
-          cd "$TEMP/wasm-bindgen"
-          curl -LO "https://github.com/rustwasm/wasm-bindgen/releases/download/0.2.122/wasm-bindgen-0.2.122-x86_64-unknown-linux-musl.tar.gz"
-          tar xzf wasm-bindgen-0.2.122-x86_64-unknown-linux-musl.tar.gz
-          echo "$TEMP/wasm-bindgen/wasm-bindgen-0.2.122-x86_64-unknown-linux-musl" >> $GITHUB_PATH
-      - name: Build WASM (Linux/macOS)
-        if: runner.os != 'Windows'
+          case "$RUNNER_OS" in
+            Linux)  WB="x86_64-unknown-linux-musl" ;;
+            macOS)  WB="x86_64-apple-darwin" ;;
+            Windows) WB="x86_64-pc-windows-msvc" ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/wasm-bindgen"
+          cd "$RUNNER_TEMP/wasm-bindgen"
+          curl -LO "https://github.com/rustwasm/wasm-bindgen/releases/download/0.2.122/wasm-bindgen-0.2.122-${WB}.tar.gz"
+          tar xzf "wasm-bindgen-0.2.122-${WB}.tar.gz"
+          echo "$RUNNER_TEMP/wasm-bindgen/wasm-bindgen-0.2.122-${WB}" >> $GITHUB_PATH
+      - name: Build WASM
         shell: bash
-        run: |
-          node build.cjs
-      - name: Build WASM (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          export TEMP="/tmp/skynet-wasm-build"
-          mkdir -p "$TEMP"
-          node build.cjs
+        run: node build.cjs
       - uses: actions/upload-artifact@v4
         with:
           name: wasm-dist-${{ matrix.os }}
