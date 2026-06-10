@@ -31,64 +31,106 @@ export class HnswIndex {
   private vectors: Map<string, Float32Array> = new Map();
   private labels: string[] = [];
   private readonly M: number = 16;
-  private readonly mL: number = 1 / Math.log(this.M);
-  private layers: Map<number, Map<string, Set<string>>> = new Map();
+  private readonly efConstruction: number = 32;
+  private efSearch: number = 16;
+  private neighborCache: Map<string, Set<string>> = new Map();
+  private queryHistory: Array<{ sim: number }> = [];
 
   constructor() {
-    this.layers.set(0, new Map());
   }
 
-  private randomLevel(): number {
-    let l = 0;
-    while (Math.random() < this.mL && l < 4) l++;
-    return l;
+  setEfSearch(ef: number): void {
+    this.efSearch = Math.max(1, ef);
+  }
+
+  getEfSearch(): number {
+    return this.efSearch;
+  }
+
+  adaptiveEf(query: Float32Array, k: number): number {
+    if (this.queryHistory.length < 10) return this.efSearch;
+    const recentSims = this.queryHistory.slice(-10);
+    const avgSim = recentSims.reduce((s, r) => s + r.sim, 0) / recentSims.length;
+    if (avgSim < 0.3) return Math.min(this.efSearch * 2, 64);
+    if (avgSim < 0.5) return this.efSearch;
+    return Math.max(this.efSearch / 2, 4);
+  }
+
+  private l2Norm(v: Float32Array): number {
+    let sum = 0;
+    for (let i = 0; i < v.length; i++) sum += v[i] * v[i];
+    return Math.sqrt(sum);
+  }
+
+  private dotProduct(a: Float32Array, b: Float32Array): number {
+    let d = 0;
+    for (let i = 0; i < a.length; i++) d += a[i] * b[i];
+    return d;
   }
 
   add(id: string, vector: Float32Array): void {
-    const level = this.randomLevel();
     this.vectors.set(id, vector);
     this.labels.push(id);
 
-    for (let l = 0; l <= level; l++) {
-      if (!this.layers.has(l)) this.layers.set(l, new Map());
-      const layer = this.layers.get(l)!;
-      layer.set(id, new Set());
+    const candidates = this.labels.filter(x => x !== id);
+    const distances = candidates.map(c => ({
+      id: c,
+      sim: cosineSimilarity(vector, this.vectors.get(c)!),
+    }));
+    distances.sort((a, b) => b.sim - a.sim);
 
-      const candidates = this.labels.filter(x => x !== id);
-      const distances = candidates.map(c => ({
-        id: c,
-        sim: cosineSimilarity(vector, this.vectors.get(c)!),
-      }));
-      distances.sort((a, b) => b.sim - a.sim);
+    const neighbors = new Set(distances.slice(0, this.M).map(n => n.id));
+    this.neighborCache.set(id, neighbors);
 
-      const neighbors = distances.slice(0, this.M);
-      for (const n of neighbors) {
-        layer.get(id)!.add(n.id);
-        if (layer.has(n.id)) {
-          layer.get(n.id)!.add(id);
-        }
+    for (const nId of neighbors) {
+      if (this.neighborCache.has(nId)) {
+        this.neighborCache.get(nId)!.add(id);
       }
     }
   }
 
   search(query: Float32Array, k: number = 5): string[] {
     if (this.labels.length === 0) return [];
+    return this.searchWithCRouting(query, k);
+  }
 
-    const candidates = this.labels
-      .map(id => ({ id, sim: cosineSimilarity(query, this.vectors.get(id)!) }))
-      .sort((a, b) => b.sim - a.sim);
+  searchWithCRouting(query: Float32Array, k: number = 5): string[] {
+    if (this.labels.length === 0) return [];
 
-    return candidates.slice(0, k).map(c => c.id);
+    const qNorm = this.l2Norm(query);
+    const ef = this.adaptiveEf(query, k);
+    const evaluated: Array<{ id: string; sim: number }> = [];
+
+    for (const id of this.labels) {
+      if (evaluated.length >= ef) {
+        const kthSim = evaluated[evaluated.length - 1].sim;
+        const vNorm = this.l2Norm(this.vectors.get(id)!);
+        if (qNorm > 0 && vNorm > 0) {
+          const cosAngle = this.dotProduct(query, this.vectors.get(id)!) / (qNorm * vNorm);
+          if (cosAngle < kthSim - 0.15) continue;
+        }
+      }
+      const sim = cosineSimilarity(query, this.vectors.get(id)!);
+      evaluated.push({ id, sim });
+      evaluated.sort((a, b) => b.sim - a.sim);
+      if (evaluated.length > ef * 2) evaluated.length = ef * 2;
+    }
+
+    evaluated.sort((a, b) => b.sim - a.sim);
+    const topK = evaluated.slice(0, k);
+    if (topK.length > 0) {
+      this.queryHistory.push({ sim: topK[0].sim });
+      if (this.queryHistory.length > 100) this.queryHistory.shift();
+    }
+    return topK.map(c => c.id);
   }
 
   remove(id: string): void {
     this.vectors.delete(id);
     this.labels = this.labels.filter(l => l !== id);
-    for (const [, layer] of this.layers) {
-      layer.delete(id);
-      for (const [, neighbors] of layer) {
-        neighbors.delete(id);
-      }
+    this.neighborCache.delete(id);
+    for (const [, neighbors] of this.neighborCache) {
+      neighbors.delete(id);
     }
   }
 
@@ -99,8 +141,8 @@ export class HnswIndex {
   clear(): void {
     this.vectors.clear();
     this.labels = [];
-    this.layers.clear();
-    this.layers.set(0, new Map());
+    this.neighborCache.clear();
+    this.queryHistory = [];
   }
 }
 
@@ -112,10 +154,71 @@ export class SemanticRouter {
   private agents: Map<string, AgentRegistration> = new Map();
   private callbacks: Set<RouterCallback> = new Set();
   private embeddingDimension: number;
+  private successHistory: Map<string, number> = new Map();
+  private queryVectors: Map<string, Float32Array> = new Map();
 
   constructor(embeddingDimension: number = 64) {
     this.index = new HnswIndex();
     this.embeddingDimension = embeddingDimension;
+  }
+
+  refineEmbedding(agentId: string): Float32Array | null {
+    const agent = this.agents.get(agentId);
+    if (!agent || !this.successHistory.has(agentId)) return null;
+    const embedding = agent.capabilityEmbedding;
+    const refined = new Float32Array(embedding.length);
+    const successes = this.successHistory.get(agentId)!;
+    const centroid = this.computeSuccessCentroid(agentId);
+    if (!centroid) return null;
+    const alpha = Math.min(0.3, 1 / (1 + successes));
+    for (let i = 0; i < embedding.length; i++) {
+      refined[i] = embedding[i] * (1 - alpha) + centroid[i] * alpha;
+    }
+    return refined;
+  }
+
+  private computeSuccessCentroid(agentId: string): Float32Array | null {
+    let count = 0;
+    const dim = this.embeddingDimension;
+    const centroid = new Float32Array(dim);
+    for (const [qId, qVec] of this.queryVectors) {
+      if (qId.startsWith(agentId)) {
+        for (let i = 0; i < dim; i++) centroid[i] += qVec[i];
+        count++;
+      }
+    }
+    if (count === 0) return null;
+    for (let i = 0; i < dim; i++) centroid[i] /= count;
+    return centroid;
+  }
+
+  recordRoutingSuccess(subtaskId: string, agentId: string, queryEmbedding: Float32Array): void {
+    this.successHistory.set(agentId, (this.successHistory.get(agentId) || 0) + 1);
+    this.queryVectors.set(`${agentId}_${subtaskId}`, queryEmbedding);
+    if (this.queryVectors.size > 500) {
+      const first = this.queryVectors.keys().next().value;
+      if (first) this.queryVectors.delete(first);
+    }
+  }
+
+  recordRoutingFailure(subtaskId: string, agentId: string): void {
+    this.successHistory.set(agentId, Math.max(0, (this.successHistory.get(agentId) || 1) - 1));
+  }
+
+  computeAdaptiveWeights(agent: AgentRegistration): { semantic: number; tool: number; cost: number; latency: number } {
+    const successes = this.successHistory.get(agent.agentId) || 0;
+    const reliability = Math.min(1, successes / 10);
+    const semantic = 0.5 - reliability * 0.15;
+    const tool = 0.3 - reliability * 0.1;
+    const cost = 0.1 + reliability * 0.15;
+    const latency = 0.1 + reliability * 0.1;
+    const total = semantic + tool + cost + latency;
+    return {
+      semantic: semantic / total,
+      tool: tool / total,
+      cost: cost / total,
+      latency: latency / total,
+    };
   }
 
   onEvent(cb: RouterCallback): () => void {
@@ -166,20 +269,28 @@ export class SemanticRouter {
 
     const scored: RouteMatch[] = candidates
       .map(id => {
-        const agent = this.agents.get(id)!;
-        const semanticScore = cosineSimilarity(queryEmbedding, agent.capabilityEmbedding);
+        const agent = this.agents.get(id);
+        if (!agent) return null;
+        const embedding = this.refineEmbedding(id) || agent.capabilityEmbedding;
+        const semanticScore = cosineSimilarity(queryEmbedding, embedding);
         const toolScore = subtask.requiredTools.length === 0
           ? 1
           : subtask.requiredTools.filter(t => agent.tools.includes(t)).length / subtask.requiredTools.length;
         const costPenalty = agent.costPerTask / 10;
         const latencyPenalty = agent.avgLatencyMs / 1000;
-        const combinedScore = semanticScore * 0.5 + toolScore * 0.3 - costPenalty * 0.1 - latencyPenalty * 0.1;
+        const w = this.computeAdaptiveWeights(agent);
+        const combinedScore = semanticScore * w.semantic + toolScore * w.tool - costPenalty * w.cost - latencyPenalty * w.latency;
 
         return { agent, score: semanticScore, combinedScore };
       })
+      .filter((m): m is RouteMatch => m !== null)
       .sort((a, b) => b.combinedScore - a.combinedScore);
 
     const best = scored[0];
+    if (!best) {
+      this.emit('fallback_used', { subtaskId: subtask.id, agentId: '', score: 0 });
+      return null;
+    }
     this.emit('route_found', {
       subtaskId: subtask.id,
       agentId: best.agent.agentId,
@@ -208,7 +319,8 @@ export class SemanticRouter {
 
     return candidates
       .map(id => {
-        const agent = this.agents.get(id)!;
+        const agent = this.agents.get(id);
+        if (!agent) return null;
         const semanticScore = cosineSimilarity(queryEmbedding, agent.capabilityEmbedding);
         const toolScore = subtask.requiredTools.length === 0
           ? 1
@@ -219,6 +331,7 @@ export class SemanticRouter {
 
         return { agent, score: semanticScore, combinedScore };
       })
+      .filter((m): m is RouteMatch => m !== null)
       .sort((a, b) => b.combinedScore - a.combinedScore);
   }
 

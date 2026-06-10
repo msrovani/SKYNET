@@ -22,7 +22,7 @@ export class PluginRegistry {
   }
 
   private emit(event: RegistryEvent): void {
-    for (const cb of this.callbacks) cb(event);
+    for (const cb of this.callbacks) { try { cb(event); } catch { /* per ADR: tolerate handler errors */ } }
   }
 
   register(card: ModelPluginCard): PluginValidation {

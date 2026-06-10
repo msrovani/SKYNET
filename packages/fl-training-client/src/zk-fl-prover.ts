@@ -36,9 +36,9 @@ function defaultConfig(overrides?: Partial<ZkProverConfig>): ZkProverConfig {
   };
 }
 
-function hashGradientUpdate(updates: number[]): string {
+export function hashGradientUpdate(updates: number[]): string {
   let hash = 0;
-  for (let i = 0; i < Math.min(updates.length, 1024); i++) {
+  for (let i = 0; i < updates.length; i++) {
     hash = ((hash << 5) - hash + Math.round(updates[i] * 10000)) | 0;
   }
   return (hash >>> 0).toString(16).padStart(8, '0');

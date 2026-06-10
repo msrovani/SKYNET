@@ -101,6 +101,12 @@ export class CrdtSync {
     this.doc = Automerge.load(data);
   }
 
+  syncData(data: Uint8Array): void {
+    this.doc = Automerge.change(this.doc, (doc: any) => {
+      doc.externalData = Array.from(data);
+    });
+  }
+
   // ── Symbolic compression (SUPERDEV3-inspired) ──
 
   getCompressedSnapshot(): Uint8Array {

@@ -55,12 +55,17 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+      - name: Install JS dependencies
+        run: pnpm install
       - name: Download wasm-bindgen-cli
         shell: bash
         run: |
           case "$RUNNER_OS" in
             Linux)  WB="x86_64-unknown-linux-musl" ;;
-            macOS)  WB="x86_64-apple-darwin" ;;
+            macOS)
+              ARCH=$(uname -m)
+              if [ "$ARCH" = "arm64" ]; then WB="aarch64-apple-darwin"; else WB="x86_64-apple-darwin"; fi
+              ;;
             Windows) WB="x86_64-pc-windows-msvc" ;;
           esac
           mkdir -p "$RUNNER_TEMP/wasm-bindgen"

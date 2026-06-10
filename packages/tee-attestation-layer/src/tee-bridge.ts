@@ -45,7 +45,7 @@ export class TeeBridge {
       const hasNavigator = typeof navigator !== 'undefined' && navigator !== null;
       const hasWebGpu = hasNavigator && 'gpu' in navigator;
 
-      if (typeof process !== 'undefined' && process.arch === 'x64') {
+      if (typeof process !== 'undefined' && process.arch === 'x64' && this.config.allowedProviders.includes('sgx')) {
         return {
           available: true,
           type: 'sgx',
@@ -57,7 +57,7 @@ export class TeeBridge {
         };
       }
 
-      if (hasWebGpu) {
+      if (hasWebGpu && this.config.allowedProviders.includes('cca')) {
         return {
           available: true,
           type: 'cca',
@@ -69,7 +69,7 @@ export class TeeBridge {
         };
       }
 
-      if (typeof (globalThis as any).__TAURI__ !== 'undefined') {
+      if (typeof (globalThis as any).__TAURI__ !== 'undefined' && this.config.allowedProviders.includes('sev')) {
         return {
           available: true,
           type: 'sev',

@@ -27,3 +27,19 @@ export {
   type CcaConfig, type CcaRealmInfo, type CcaRealmState,
   type CcaAttestationReport, type CcaVerificationResult,
 } from './cca-attestation.js';
+
+export {
+  DStackContainer, type DStackConfig, type DStackAttestation,
+} from './dstack-container.js';
+
+export {
+  NearMPCTEE, type MPCNodeConfig, type MPCKeyShare, type MPCSignatureResult,
+} from './near-mpc-tee.js';
+
+export {
+  CRACollectiveAttestation, type CRANodeState, type CRAAttestationReport, type CRAVerificationResult,
+} from './cra-attestation.js';
+
+export {
+  KeylimeContinuousAttestation, type KeylimeConfig, type KeylimeMeasurement, type KeylimeVerificationResult,
+} from './keylime-attestation.js';

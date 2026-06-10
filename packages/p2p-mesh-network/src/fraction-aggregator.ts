@@ -1,3 +1,5 @@
+import { blake3Checksum } from '@skynet/core-wasm-engine';
+
 export interface AgentFraction {
   subTaskId: string;
   agentId: string;
@@ -35,7 +37,15 @@ export interface AggregatedResult {
 export type AggregatorEvent = 'fraction_received' | 'fraction_rejected' | 'consistency_fail' | 'aggregation_complete' | 'refinement_requested';
 export type AggregatorCallback = (event: AggregatorEvent, data: any) => void;
 
-function blake3Checksum(data: Uint8Array): string {
+function directBlake3Checksum(data: Uint8Array): string {
+  try {
+    return blake3Checksum(data);
+  } catch {
+    return simpleHash(data);
+  }
+}
+
+function simpleHash(data: Uint8Array): string {
   const hexChars = '0123456789abcdef';
   let hash = 0;
   for (let i = 0; i < data.length; i++) {
@@ -44,13 +54,13 @@ function blake3Checksum(data: Uint8Array): string {
   let result = '';
   for (let i = 0; i < 8; i++) {
     result = hexChars[hash & 0x0f] + hexChars[(hash >> 4) & 0x0f] + result;
-    hash = Math.floor(hash / 256);
+    hash = (hash >>> 8) | 0;
   }
-  return result + '000000000000000000000000';
+  return result;
 }
 
 export function computeSimpleChecksum(data: Uint8Array): string {
-  return blake3Checksum(data);
+  return directBlake3Checksum(data);
 }
 
 export class FractionAggregator {

@@ -27,7 +27,7 @@ export class AgentHost {
   }
 
   private registerBuiltinTools(): void {
-    this.tools.set('html-renderer', (input: string) => `<div>${input}</div>`);
+    this.tools.set('html-renderer', (input: string) => `<div>${input.replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c] || c)}</div>`);
     this.tools.set('css-generator', (input: string) => `.generated { content: "${input}"; }`);
     this.tools.set('text-generator', (input: string) => `Generated text: ${input}`);
     this.tools.set('markdown-formatter', (input: string) => `# ${input}\n\nFormatted content.`);
@@ -38,14 +38,14 @@ export class AgentHost {
     this.tools.set('cdn-upload', (input: string) => `https://cdn.skynet.network/${input.replace(/\s+/g, '-').toLowerCase()}`);
   }
 
-  spawnAgent(templateName: string, customId?: string): HostedAgent {
+  async spawnAgent(templateName: string, customId?: string): Promise<HostedAgent> {
     if (this.agents.size >= this.config.maxAgents) {
       throw new Error(`Max agents (${this.config.maxAgents}) reached`);
     }
 
     const id = customId ?? `${templateName}-${Date.now()}`;
     const runtime = createAgentFromTemplate(templateName, id);
-    runtime.load();
+    await runtime.load();
 
     const hosted: HostedAgent = {
       id,
@@ -59,13 +59,13 @@ export class AgentHost {
     return hosted;
   }
 
-  executeAgent(agentId: string, input: AgentInput): AgentOutput | null {
+  async executeAgent(agentId: string, input: AgentInput): Promise<AgentOutput | null> {
     const hosted = this.agents.get(agentId);
     if (!hosted) return null;
 
     if (hosted.runtime.state === 'completed') {
       hosted.runtime.reset();
-      hosted.runtime.load();
+      await hosted.runtime.load();
     }
 
     try {

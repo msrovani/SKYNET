@@ -74,7 +74,10 @@ export class ModelLoader {
     const cached = this.cache.get(config.id);
     if (cached) return cached;
 
-    const response = await fetch(config.modelUrl);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    const response = await fetch(config.modelUrl, { signal: controller.signal });
+    clearTimeout(timeout);
     if (!response.ok) throw new Error(`Failed to load model ${config.id}: ${response.status}`);
 
     const contentLength = response.headers.get('content-length');
@@ -100,7 +103,7 @@ export class ModelLoader {
       offset += chunk.length;
     }
 
-    const buffer = combined.buffer as ArrayBuffer;
+    const buffer = combined.buffer.slice(combined.byteOffset, combined.byteOffset + combined.byteLength) as ArrayBuffer;
     this.cache.set(config.id, buffer);
     return buffer;
   }
@@ -121,5 +124,104 @@ export class ModelLoader {
 
   removeCached(id: string): boolean {
     return this.cache.delete(id);
+  }
+}
+
+export class DynamicPrecisionController {
+  private basePrecision: Quantization;
+  private currentPrecision: Quantization;
+  private readonly networkQualityThresholds: Map<string, number> = new Map();
+  private readonly PRECISION_ORDER: Quantization[] = ['fp32', 'fp16', 'int8', 'int4'];
+
+  constructor(basePrecision: Quantization = 'int8') {
+    this.basePrecision = basePrecision;
+    this.currentPrecision = basePrecision;
+  }
+
+  adjustForNetwork(bandwidthMbps: number, rttMs: number): Quantization {
+    const score = bandwidthMbps / (rttMs + 1);
+    const idx = this.PRECISION_ORDER.indexOf(this.basePrecision);
+    if (score > 100) {
+      this.currentPrecision = this.PRECISION_ORDER[Math.min(idx, this.PRECISION_ORDER.length - 1)];
+    } else if (score > 10) {
+      this.currentPrecision = this.PRECISION_ORDER[Math.min(idx + 1, this.PRECISION_ORDER.length - 1)];
+    } else {
+      this.currentPrecision = this.PRECISION_ORDER[Math.min(idx + 2, this.PRECISION_ORDER.length - 1)];
+    }
+    return this.currentPrecision;
+  }
+
+  getCurrentPrecision(): Quantization { return this.currentPrecision; }
+  getMemoryMultiplier(): number {
+    const base = { fp32: 1, fp16: 0.5, int8: 0.25, int4: 0.125 };
+    return base[this.currentPrecision] / base[this.basePrecision];
+  }
+
+  reset(): void {
+    this.currentPrecision = this.basePrecision;
+  }
+}
+
+export type NestedPrecision = 'int8_nested_int4' | 'int8_nested_int2';
+
+export class MatQuantEncoder {
+  private readonly blockSize: number;
+
+  constructor(blockSize: number = 128) {
+    this.blockSize = blockSize;
+  }
+
+  encodeInt4(data: Float32Array, blockSize?: number): { packed: Uint8Array; scales: Float32Array } {
+    const bs = blockSize || this.blockSize;
+    const n = data.length;
+    const packedSize = Math.ceil(n / 2);
+    const packed = new Uint8Array(packedSize);
+    const numBlocks = Math.ceil(n / bs);
+    const scales = new Float32Array(numBlocks * 2);
+    for (let b = 0; b < numBlocks; b++) {
+      const start = b * bs;
+      const end = Math.min(start + bs, n);
+      let min = Infinity, max = -Infinity;
+      for (let i = start; i < end; i++) {
+        if (data[i] < min) min = data[i];
+        if (data[i] > max) max = data[i];
+      }
+      const scale = (max - min) < 1e-10 ? 1.0 : (max - min) / 15.0;
+      scales[b * 2] = min;
+      scales[b * 2 + 1] = scale;
+      for (let i = start; i < end; i++) {
+        const q = Math.round((data[i] - min) / scale);
+        const bi = Math.floor((i - start) / 2);
+        if ((i - start) % 2 === 0) {
+          packed[b * 64 + bi] = (packed[b * 64 + bi] & 0xF0) | (Math.min(15, Math.max(0, q)) & 0x0F);
+        } else {
+          packed[b * 64 + bi] = (packed[b * 64 + bi] & 0x0F) | ((Math.min(15, Math.max(0, q)) << 4) & 0xF0);
+        }
+      }
+    }
+    return { packed, scales };
+  }
+
+  extractInt2(encoded: { packed: Uint8Array; scales: Float32Array }, n: number): { packed: Uint8Array; scales: Float32Array } {
+    const int2PackedSize = Math.ceil(n / 4);
+    const int2Packed = new Uint8Array(int2PackedSize);
+    const numBlocks = Math.ceil(n / this.blockSize);
+    const int2Scales = new Float32Array(numBlocks * 2);
+    for (let b = 0; b < numBlocks; b++) {
+      const start = b * this.blockSize;
+      const end = Math.min(start + this.blockSize, n);
+      const min = encoded.scales[b * 2];
+      const scale = encoded.scales[b * 2 + 1];
+      const int2Scale = scale * 5.0;
+      int2Scales[b * 2] = min;
+      int2Scales[b * 2 + 1] = int2Scale;
+      for (let i = start; i < end; i++) {
+        const byteIdx = Math.floor(i / 4);
+        const bitShift = (i % 4) * 2;
+        const val = Math.min(3, Math.max(0, Math.round(3 * (i - start) / (end - start - 1 || 1))));
+        int2Packed[byteIdx] = (int2Packed[byteIdx] & ~(3 << bitShift)) | (val << bitShift);
+      }
+    }
+    return { packed: int2Packed, scales: int2Scales };
   }
 }

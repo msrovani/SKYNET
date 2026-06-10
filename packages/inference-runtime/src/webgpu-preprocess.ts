@@ -57,7 +57,7 @@ export async function getWebGpuAdapter(): Promise<any | null> {
 export async function getAdapterInfo(): Promise<WebGpuAdapterInfo | null> {
   const adapter = await getWebGpuAdapter();
   if (!adapter) return null;
-  const info = adapter.info || {};
+  const info = (await (adapter as any).requestAdapterInfo?.()) || {};
   return {
     vendor: info.vendor || 'unknown',
     architecture: info.architecture || 'unknown',

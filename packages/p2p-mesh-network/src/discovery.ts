@@ -35,11 +35,28 @@ export class PeerDiscovery {
 
   private async discoverViaSignalling(): Promise<void> {
     const ws = new WebSocket(this.config.signallingUrl);
+    const discovered: DiscoveredPeer[] = [];
     await new Promise<void>((resolve, reject) => {
-      ws.onopen = () => resolve();
-      ws.onerror = () => reject(new Error('Signalling connection failed'));
+      const timeout = setTimeout(() => { ws.close(); reject(new Error('Signalling timeout')); }, 10000);
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'discover' }));
+      };
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'peers' && Array.isArray(data.peers)) {
+            for (const p of data.peers) {
+              discovered.push(p);
+            }
+          }
+        } catch { /* skip malformed */ }
+      };
+      ws.onerror = () => { clearTimeout(timeout); reject(new Error('Signalling connection failed')); };
+      ws.onclose = () => { clearTimeout(timeout); resolve(); };
     });
-    ws.send(JSON.stringify({ type: 'discover' }));
+    for (const peer of discovered) {
+      this.discoveredPeers.set(peer.id, peer);
+    }
   }
 
   private async discoverViaMDNS(): Promise<void> {

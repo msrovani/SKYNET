@@ -198,7 +198,9 @@ pub fn shard_colwise(tensor_id: &str, data: &[f32], rows: usize, cols: usize, nu
 }
 
 pub fn reconstruct_from_shards(shards: &[TensorShard], original_rows: usize, original_cols: usize) -> TensorDescriptor {
-    assert!(!shards.is_empty(), "Must have at least one shard");
+    if shards.is_empty() {
+        return TensorDescriptor { rows: 0, cols: 0, data: vec![] };
+    }
 
     let is_rowwise = shards[0].metadata.row_end - shards[0].metadata.row_start > 0
         && shards[0].metadata.col_end - shards[0].metadata.col_start == original_cols;
@@ -236,4 +238,64 @@ pub fn reconstruct_from_shards(shards: &[TensorShard], original_rows: usize, ori
 pub fn verify_shard(shard: &TensorShard) -> bool {
     let checksum = shard.data.iter().fold(0u32, |acc, &v| acc.wrapping_add(v.to_bits()));
     checksum == shard.metadata.checksum
+}
+
+fn compute_local_density(data: &[f32], point_idx: usize, dim: usize, radius: f32) -> f32 {
+    if data.len() < dim * 2 { return 1.0; }
+    let point = &data[point_idx * dim..(point_idx + 1) * dim];
+    let mut count = 0u32;
+    let total = data.len() / dim;
+    for i in 0..total {
+        if i == point_idx { continue; }
+        let other = &data[i * dim..(i + 1) * dim];
+        let mut dist = 0.0f32;
+        for j in 0..dim {
+            let d = point[j] - other[j];
+            dist += d * d;
+        }
+        if dist.sqrt() < radius { count += 1; }
+    }
+    count as f32 / (total - 1) as f32
+}
+
+pub fn density_aware_quantize_int4(weights: &[f32], dim: usize) -> (Vec<u8>, Vec<f32>) {
+    let n = weights.len();
+    let num_points = n / dim;
+    let radius = (0.1f32).max(1.0 / (dim as f32).sqrt());
+    let mut densities = Vec::with_capacity(num_points);
+    for i in 0..num_points {
+        densities.push(compute_local_density(weights, i, dim, radius));
+    }
+    let avg_density: f32 = densities.iter().sum::<f32>() / num_points as f32;
+    let packed_size = (n + 1) / 2;
+    let mut packed = vec![0u8; packed_size];
+    let mut scales = Vec::with_capacity(n / 128 + 1);
+    for (chunk_idx, chunk) in weights.chunks(128).enumerate() {
+        let min = chunk.iter().cloned().fold(f32::INFINITY, f32::min);
+        let max = chunk.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let density_factor = if chunk_idx < densities.len() {
+            (densities[chunk_idx] / avg_density.max(0.01)).clamp(0.5, 2.0)
+        } else {
+            1.0
+        };
+        let effective_bits = (16.0 * density_factor).round().clamp(4.0, 16.0) as u32;
+        let scale = if (max - min).abs() < 1e-10 { 1.0 } else { (max - min) / ((1u32 << effective_bits) - 1) as f32 };
+        scales.push(min);
+        scales.push(scale);
+        for (i, &val) in chunk.iter().enumerate() {
+            let q = ((val - min) / scale).round().clamp(0.0, 15.0) as u8;
+            let byte_idx = i / 2;
+            if i % 2 == 0 {
+                packed[byte_idx] = (packed[byte_idx] & 0xF0) | (q & 0x0F);
+            } else {
+                packed[byte_idx] = (packed[byte_idx] & 0x0F) | ((q << 4) & 0xF0);
+            }
+        }
+    }
+    (packed, scales)
+}
+
+pub fn matmul_with_density_quant(a: &[f32], b_quant: &[u8], b_scales: &[f32], m: usize, n: usize, k: usize) -> Result<Vec<f32>, JsValue> {
+    let b = dequantize_int4(b_quant, b_scales, k * n);
+    matmul_fallback(a, &b, m, n, k)
 }

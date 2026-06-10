@@ -1,4 +1,4 @@
-import { ZkFlProver } from './zk-fl-prover.js';
+import { ZkFlProver, hashGradientUpdate } from './zk-fl-prover.js';
 import type { ZkProof, ZkProverConfig } from './zk-fl-prover.js';
 import type { FedYogiConfig } from './fed-yogi.js';
 
@@ -65,9 +65,11 @@ export class ZkFlVerifier {
     }
 
     if (proof.simulated) {
+      const expectedHash = hashGradientUpdate(originalUpdate);
       const verified = proof.proofData.startsWith('zk_sim_')
         && proof.publicInputs.length === 3
-        && proof.updateHash.length === 8;
+        && proof.updateHash.length === 8
+        && proof.updateHash === expectedHash;
       return {
         verified,
         timestamp: Date.now(),

@@ -1,6 +1,7 @@
 export class WebRTCFallback {
   private pc: RTCPeerConnection | null = null;
   private dataChannel: RTCDataChannel | null = null;
+  private messageHandlers: Set<(data: Uint8Array) => void> = new Set();
   private config: RTCConfiguration = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -29,15 +30,17 @@ export class WebRTCFallback {
 
   send(data: Uint8Array): void {
     if (this.dataChannel?.readyState === 'open') {
-      this.dataChannel.send(data.buffer as ArrayBuffer);
+      this.dataChannel.send(data.slice().buffer as ArrayBuffer);
     }
   }
 
   onMessage(handler: (data: Uint8Array) => void): void {
-    if (this.dataChannel) {
+    this.messageHandlers.add(handler);
+    if (this.dataChannel && this.messageHandlers.size === 1) {
       this.dataChannel.onmessage = (event) => {
         if (event.data instanceof ArrayBuffer) {
-          handler(new Uint8Array(event.data));
+          const data = new Uint8Array(event.data);
+          for (const h of this.messageHandlers) h(data);
         }
       };
     }

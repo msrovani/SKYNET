@@ -327,3 +327,211 @@ export class DynamicShifter {
     return [...this.modelChain];
   }
 }
+
+export interface VmPlacement {
+  vmId: string;
+  nodeId: string;
+  thermalScore: number;
+  estimatedTempRise: number;
+}
+
+export class TAPASScheduler {
+  private history: Map<string, ThermalReading[]> = new Map();
+  private readonly HISTORY_LIMIT = 100;
+  private readonly TEMP_RISE_PER_WATT = 0.042;
+  private readonly CRITICAL_TEMP = 85;
+
+  recordNodeReading(nodeId: string, reading: ThermalReading): void {
+    if (!this.history.has(nodeId)) this.history.set(nodeId, []);
+    const readings = this.history.get(nodeId)!;
+    readings.push(reading);
+    if (readings.length > this.HISTORY_LIMIT) readings.shift();
+  }
+
+  getThermalScore(nodeId: string): number {
+    const readings = this.history.get(nodeId);
+    if (!readings || readings.length < 3) return 1;
+
+    const recent = readings.slice(-5);
+    const avgHeadroom = recent.reduce((s, r) => s + r.headroom, 0) / recent.length;
+    const trend = recent.length >= 2
+      ? recent[recent.length - 1].headroom - recent[0].headroom
+      : 0;
+
+    const headroomScore = Math.min(1, avgHeadroom / 20);
+    const trendPenalty = trend < -2 ? 0.3 : trend < 0 ? 0.15 : 0;
+    const loadPenalty = (recent.reduce((s, r) => s + r.cpuLoad + r.gpuLoad, 0) / (recent.length * 200)) * 0.2;
+
+    return Math.max(0.05, headroomScore * 0.5 - trendPenalty - loadPenalty);
+  }
+
+  recommendPlacement(vmId: string, powerWatt: number, availableNodes: string[]): VmPlacement {
+    const scored = availableNodes.map(nodeId => {
+      const thermalScore = this.getThermalScore(nodeId);
+      const estimatedTempRise = powerWatt * this.TEMP_RISE_PER_WATT;
+      return { vmId, nodeId, thermalScore, estimatedTempRise };
+    });
+
+    scored.sort((a, b) => b.thermalScore - a.thermalScore);
+    return scored[0];
+  }
+
+  routeRequest(nodeId: string, currentHeadroom: number): boolean {
+    if (currentHeadroom < 3) return false;
+    const score = this.getThermalScore(nodeId);
+    const recent = this.history.get(nodeId);
+    if (recent && recent.length >= 2) {
+      const trend = recent[recent.length - 1].headroom - recent[0].headroom;
+      if (trend < -3 && currentHeadroom < 8) return false;
+    }
+    return score > 0.15;
+  }
+
+  getNodeHistory(nodeId: string): ThermalReading[] {
+    return [...(this.history.get(nodeId) || [])];
+  }
+
+  clearHistory(nodeId?: string): void {
+    if (nodeId) this.history.delete(nodeId);
+    else this.history.clear();
+  }
+}
+
+export interface FUSEConfig {
+  cpuFreq: number;
+  gpuFreq: number;
+  memFreq: number;
+}
+
+const FUSE_PROFILES: Map<string, FUSEConfig> = new Map([
+  ['mobile_safe', { cpuFreq: 1800, gpuFreq: 800, memFreq: 3200 }],
+  ['mobile_warm', { cpuFreq: 1400, gpuFreq: 600, memFreq: 2400 }],
+  ['mobile_hot', { cpuFreq: 1000, gpuFreq: 400, memFreq: 1800 }],
+  ['mobile_critical', { cpuFreq: 600, gpuFreq: 200, memFreq: 1200 }],
+  ['laptop_safe', { cpuFreq: 2500, gpuFreq: 1200, memFreq: 4800 }],
+  ['laptop_warm', { cpuFreq: 2000, gpuFreq: 900, memFreq: 3600 }],
+  ['laptop_hot', { cpuFreq: 1500, gpuFreq: 600, memFreq: 2400 }],
+  ['laptop_critical', { cpuFreq: 800, gpuFreq: 300, memFreq: 1600 }],
+  ['desktop_safe', { cpuFreq: 3500, gpuFreq: 1800, memFreq: 6400 }],
+  ['desktop_warm', { cpuFreq: 2800, gpuFreq: 1400, memFreq: 4800 }],
+  ['desktop_hot', { cpuFreq: 2000, gpuFreq: 1000, memFreq: 3200 }],
+  ['desktop_critical', { cpuFreq: 1200, gpuFreq: 600, memFreq: 2000 }],
+]);
+
+export class FUSEGovernor {
+  private model: string;
+  private deviceClass: DeviceClass;
+  private batchSize: number;
+  private configCache: Map<string, FUSEConfig> = new Map();
+
+  constructor(model: string = 'default', deviceClass: DeviceClass = 'mobile', batchSize: number = 128) {
+    this.model = model;
+    this.deviceClass = deviceClass;
+    this.batchSize = batchSize;
+  }
+
+  lookup(zone: ThermalZone): FUSEConfig {
+    const key = `${this.deviceClass}_${zone}`;
+    const cached = this.configCache.get(key);
+    if (cached) return cached;
+    const profile = FUSE_PROFILES.get(key) || FUSE_PROFILES.get('mobile_safe')!;
+    const config: FUSEConfig = { ...profile };
+    if (this.batchSize > 256) {
+      config.gpuFreq = Math.round(config.gpuFreq * 0.85);
+      config.cpuFreq = Math.round(config.cpuFreq * 0.9);
+    }
+    this.configCache.set(key, config);
+    return config;
+  }
+
+  prefillConfig(deviceClass: DeviceClass, batchSize: number): void {
+    const zones: ThermalZone[] = ['safe', 'warm', 'hot', 'critical'];
+    for (const z of zones) {
+      const key = `${deviceClass}_${z}_${batchSize}`;
+      const profile = FUSE_PROFILES.get(`${deviceClass}_${z}`)!;
+      const config: FUSEConfig = { ...profile };
+      if (batchSize > 256) {
+        config.gpuFreq = Math.round(config.gpuFreq * 0.85);
+        config.cpuFreq = Math.round(config.cpuFreq * 0.9);
+      }
+      this.configCache.set(key, config);
+    }
+  }
+
+  clearCache(): void {
+    this.configCache.clear();
+  }
+}
+
+export interface BanditAction {
+  gpuFreq: number;
+  batchSize: number;
+}
+
+export class AGFTScheduler {
+  private actions: BanditAction[];
+  private qValues: number[];
+  private counts: number[];
+  private totalPlays: number;
+  private readonly explorationRate: number;
+
+  constructor() {
+    this.actions = [
+      { gpuFreq: 300, batchSize: 32 },
+      { gpuFreq: 600, batchSize: 64 },
+      { gpuFreq: 900, batchSize: 128 },
+      { gpuFreq: 1200, batchSize: 128 },
+      { gpuFreq: 1500, batchSize: 64 },
+      { gpuFreq: 1800, batchSize: 32 },
+    ];
+    this.qValues = new Array(this.actions.length).fill(0);
+    this.counts = new Array(this.actions.length).fill(0);
+    this.totalPlays = 0;
+    this.explorationRate = 0.3;
+  }
+
+  selectAction(thermalZone: ThermalZone): BanditAction {
+    if (Math.random() < this.explorationRate && this.totalPlays > 10) {
+      const safeActions = this.actions.filter((_, i) => {
+        const freq = this.actions[i].gpuFreq;
+        if (thermalZone === 'critical') return freq <= 600;
+        if (thermalZone === 'hot') return freq <= 900;
+        if (thermalZone === 'warm') return freq <= 1200;
+        return true;
+      });
+      if (safeActions.length > 0) {
+        const idx = Math.floor(Math.random() * safeActions.length);
+        return safeActions[idx];
+      }
+    }
+    let bestIdx = 0;
+    let bestQ = -Infinity;
+    for (let i = 0; i < this.actions.length; i++) {
+      const freq = this.actions[i].gpuFreq;
+      if (thermalZone === 'critical' && freq > 600) continue;
+      if (thermalZone === 'hot' && freq > 900) continue;
+      if (thermalZone === 'warm' && freq > 1200) continue;
+      if (this.qValues[i] > bestQ) {
+        bestQ = this.qValues[i];
+        bestIdx = i;
+      }
+    }
+    return this.actions[bestIdx];
+  }
+
+  updateReward(actionIndex: number, reward: number): void {
+    if (actionIndex < 0 || actionIndex >= this.actions.length) return;
+    this.counts[actionIndex]++;
+    this.totalPlays++;
+    const alpha = 1 / this.counts[actionIndex];
+    this.qValues[actionIndex] += alpha * (reward - this.qValues[actionIndex]);
+  }
+
+  getActions(): BanditAction[] {
+    return [...this.actions];
+  }
+
+  getStats(): { qValues: number[]; counts: number[]; totalPlays: number } {
+    return { qValues: [...this.qValues], counts: [...this.counts], totalPlays: this.totalPlays };
+  }
+}

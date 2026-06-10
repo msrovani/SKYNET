@@ -33,6 +33,7 @@ serde-wasm-bindgen = "0.6"
 console_error_panic_hook = "0.1"
 getrandom = { version = "0.2", features = ["js"] }
 fastrand = "2"
+blake3 = { version = "1", features = ["wasm32_simd"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

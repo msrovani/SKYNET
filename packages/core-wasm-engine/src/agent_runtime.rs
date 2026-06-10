@@ -1,3 +1,4 @@
+use js_sys;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,9 +73,9 @@ impl AgentRuntime {
         }
         self.state = AgentState::Executing;
 
-        let start = std::time::Instant::now();
+        let start = js_sys::Date::now();
         let content = self.generate(input);
-        let latency = start.elapsed().as_secs_f64() * 1000.0;
+        let latency = js_sys::Date::now() - start;
 
         let output = AgentOutput {
             agent_id: self.config.agent_id.clone(),

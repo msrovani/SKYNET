@@ -403,3 +403,15 @@ pub fn inference_checkpoint_forward(
     let cp = inference::checkpoint_forward(&inp, &wgt, hidden_dim, layer_idx, pos);
     serde_wasm_bindgen::to_value(&cp).unwrap_or(JsValue::NULL)
 }
+
+#[wasm_bindgen]
+pub fn blake3_checksum(data: &[u8]) -> Vec<u8> {
+    let hash = blake3::hash(data);
+    hash.as_bytes().to_vec()
+}
+
+#[wasm_bindgen]
+pub fn blake3_hex(data: &[u8]) -> String {
+    let hash = blake3::hash(data);
+    hash.to_hex().to_string()
+}

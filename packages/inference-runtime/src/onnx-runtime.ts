@@ -24,7 +24,10 @@ export class OnnxRuntimeWeb {
     const feeds: Record<string, any> = {};
     feeds[this.session.inputNames[0]] = inputTensor;
     const results = await this.session.run(feeds);
-    const output = results[this.session.outputNames[0]];
-    return output.data instanceof Float32Array ? output.data : new Float32Array(output.data as number[]);
+    const outputName = this.session.outputNames[0];
+    if (!outputName) throw new Error('Model has no outputs');
+    const output = results[outputName];
+    if (!output) throw new Error('Output not found in results');
+    return output.data instanceof Float32Array ? output.data : Float32Array.from(output.data as any);
   }
 }

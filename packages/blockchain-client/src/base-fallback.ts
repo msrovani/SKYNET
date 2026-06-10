@@ -47,7 +47,7 @@ export class BaseFallback {
   constructor(config?: Partial<BaseBridgeConfig>) {
     this.config = {
       rpcUrl: config?.rpcUrl ?? 'https://mainnet.base.org',
-      l1RpcUrl: config?.l1RpcUrl ?? 'https://api.etherscan.io',
+      l1RpcUrl: config?.l1RpcUrl ?? 'https://eth.llamarpc.com',
       portalAddress: config?.portalAddress ?? '0x49048044D57e1C92A77f7995C4B97Ae5B0b5F9C3',
       maxConfirmations: config?.maxConfirmations ?? 12,
     };
@@ -159,8 +159,8 @@ export class BaseFallback {
 
       return {
         valid,
-        stateRoot: this.config.rpcUrl,
-        outputRoot: this.config.rpcUrl,
+      stateRoot: '',
+      outputRoot: '',
         l2BlockNumber: withdrawal.l2BlockNumber,
         error: result.error?.message,
       };

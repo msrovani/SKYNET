@@ -1,5 +1,7 @@
 import type { PaymentQuote, PaymentReceipt, PaymentStatus } from './solana-x402.js';
 
+const MATIC_USD_PRICE = 0.60;
+
 export type TransactionSigner = (tx: {
   to: string;
   value: string;
@@ -54,6 +56,7 @@ async function getGasPrice(rpcUrl: string, simulate: boolean): Promise<number> {
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_gasPrice' }),
     });
     const data = await resp.json() as any;
+    if (!data?.result) return 50;
     return parseInt(data.result, 16) / 1e9;
   } catch {
     return 50;
@@ -81,7 +84,7 @@ export class PolygonAdapter {
   async requestQuote(amountUsd: number): Promise<ChainQuote> {
     const gasPriceGwei = await getGasPrice(this.config.rpcUrl, this.config.simulate);
     const gasEstimate = 65000;
-    const totalFeeUsd = this.config.simulate ? amountUsd * 0.002 : (gasEstimate * gasPriceGwei * 1e-9) * 1800;
+    const totalFeeUsd = this.config.simulate ? amountUsd * 0.002 : (gasEstimate * gasPriceGwei * 1e-9) * MATIC_USD_PRICE;
     return {
       chainId: this.config.chainId,
       chainName: 'polygon',
@@ -148,7 +151,7 @@ export class ArbitrumAdapter {
   async requestQuote(amountUsd: number): Promise<ChainQuote> {
     const gasPriceGwei = await getGasPrice(this.config.rpcUrl, this.config.simulate);
     const gasEstimate = 90000;
-    const totalFeeUsd = this.config.simulate ? amountUsd * 0.003 : (gasEstimate * gasPriceGwei * 1e-9) * 1800;
+    const totalFeeUsd = this.config.simulate ? amountUsd * 0.003 : (gasEstimate * gasPriceGwei * 1e-9) * 0.60;
     return {
       chainId: this.config.chainId,
       chainName: 'arbitrum',

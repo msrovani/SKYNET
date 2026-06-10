@@ -57,7 +57,7 @@ export class PipelineManager {
   }
 
   private emit(event: PipelineEvent): void {
-    for (const cb of this.callbacks) cb(event);
+    for (const cb of this.callbacks) { try { cb(event); } catch { /* per ADR: tolerate handler errors */ } }
   }
 
   setTransport(tm: TransportManager): void {
@@ -185,4 +185,94 @@ export function computePeerWeight(cap: PeerCapability): number {
   const bandwidth = cap.bandwidthGbps * 3;
   const latencyPenalty = 1 / Math.max(cap.latencyMs, 1);
   return Math.max(1, (compute + memory + bandwidth) * latencyPenalty);
+}
+
+export type ParallelismType = 'tp' | 'ep' | 'cp' | 'dp' | 'pp';
+
+export interface ParallelFoldingConfig {
+  attentionParallelism: ParallelismType;
+  moeParallelism: ParallelismType;
+}
+
+export class MoEParallelFolding {
+  private config: ParallelFoldingConfig;
+  private readonly ATTENTION_DEFAULT: ParallelismType = 'tp';
+  private readonly MOE_DEFAULT: ParallelismType = 'ep';
+
+  constructor(config?: Partial<ParallelFoldingConfig>) {
+    this.config = {
+      attentionParallelism: config?.attentionParallelism ?? this.ATTENTION_DEFAULT,
+      moeParallelism: config?.moeParallelism ?? this.MOE_DEFAULT,
+    };
+  }
+
+  createPlan(numLayers: number, numExperts: number, peers: PeerCapability[]): Map<number, ParallelismType> {
+    const plan = new Map<number, ParallelismType>();
+    for (let i = 0; i < numLayers; i++) {
+      if (i < numExperts) {
+        plan.set(i, this.config.moeParallelism);
+      } else {
+        plan.set(i, this.config.attentionParallelism);
+      }
+    }
+    return plan;
+  }
+
+  assignPeersToLayers(layers: number[], peers: PeerCapability[]): Map<number, string> {
+    const assignment = new Map<number, string>();
+    const sortedPeers = [...peers].sort((a, b) => b.gpuTflops - a.gpuTflops);
+    const numPeers = sortedPeers.length;
+    layers.forEach((layer, idx) => {
+      assignment.set(layer, sortedPeers[idx % numPeers].peerId);
+    });
+    return assignment;
+  }
+
+  getConfig(): ParallelFoldingConfig { return { ...this.config }; }
+
+  setAttentionParallelism(type: ParallelismType): void { this.config.attentionParallelism = type; }
+  setMoEParallelism(type: ParallelismType): void { this.config.moeParallelism = type; }
+}
+
+export class TAHQuantTransform {
+  private readonly blockSize: number;
+  private readonly targetBits: number;
+
+  constructor(blockSize: number = 32, targetBits: number = 3) {
+    this.blockSize = blockSize;
+    this.targetBits = Math.max(2, Math.min(4, targetBits));
+  }
+
+  private hadamard2x2(a: number, b: number): [number, number] {
+    return [(a + b) / Math.SQRT2, (a - b) / Math.SQRT2];
+  }
+
+  compress(activations: Float32Array): { quantized: Float32Array; scales: Float32Array } {
+    const n = activations.length;
+    const numBlocks = Math.ceil(n / this.blockSize);
+    const quantized = new Float32Array(n);
+    const scales = new Float32Array(numBlocks);
+    for (let b = 0; b < numBlocks; b++) {
+      const start = b * this.blockSize;
+      const end = Math.min(start + this.blockSize, n);
+      const block = activations.slice(start, end);
+      let min = Infinity, max = -Infinity;
+      for (let i = 0; i < block.length; i++) {
+        if (block[i] < min) min = block[i];
+        if (block[i] > max) max = block[i];
+      }
+      const range = max - min < 1e-10 ? 1 : max - min;
+      const scale = range / (Math.pow(2, this.targetBits) - 1);
+      scales[b] = scale;
+      for (let i = 0; i < block.length; i++) {
+        quantized[start + i] = Math.round((block[i] - min) / scale) * scale + min;
+      }
+    }
+    return { quantized, scales };
+  }
+
+  getCompressionRatio(): number {
+    const bitsPerFloat = 32;
+    return bitsPerFloat / (this.targetBits + 2);
+  }
 }

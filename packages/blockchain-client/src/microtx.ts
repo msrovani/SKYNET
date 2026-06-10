@@ -113,8 +113,18 @@ export class MicroTxManager {
     };
 
     try {
-      for (const p of payments) {
-        await this.solana.channelPayment(channelId, p.amountLamports);
+      for (let i = 0; i < payments.length; i++) {
+        const p = payments[i];
+        try {
+          await this.solana.channelPayment(channelId, p.amountLamports);
+        } catch (err) {
+          for (let j = 0; j < i; j++) {
+            await this.solana.channelPayment(channelId, -payments[j].amountLamports);
+          }
+          batch.status = 'failed';
+          this.batches.push(batch);
+          return batch;
+        }
       }
       batch.status = 'confirmed';
       batch.confirmedAt = Date.now();
@@ -185,4 +195,178 @@ export class MicroTxManager {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms));
+}
+
+export interface TokenCommitment {
+  tokenIndex: number;
+  tokenId: number;
+  amountLamports: number;
+  nonce: number;
+  signature: string;
+}
+
+export class StreamingPayment {
+  private channelId: string;
+  private totalDeposited: number;
+  private spentAmount: number = 0;
+  private nonce: number = 0;
+  private commitments: TokenCommitment[] = [];
+  private status: 'open' | 'closed' = 'open';
+
+  constructor(channelId: string, depositLamports: number) {
+    this.channelId = channelId;
+    this.totalDeposited = depositLamports;
+  }
+
+  commitToken(tokenIndex: number, tokenId: number, priceLamports: number): TokenCommitment {
+    if (this.status !== 'open') throw new Error('Channel closed');
+    if (this.spentAmount + priceLamports > this.totalDeposited) throw new Error('Insufficient balance');
+
+    this.nonce++;
+    this.spentAmount += priceLamports;
+    const commitment: TokenCommitment = {
+      tokenIndex,
+      tokenId,
+      amountLamports: priceLamports,
+      nonce: this.nonce,
+      signature: `tap:${this.channelId}:${this.nonce}:${priceLamports}`,
+    };
+    this.commitments.push(commitment);
+    return commitment;
+  }
+
+  getPendingSettlement(): { commitments: TokenCommitment[]; totalSpent: number; nonce: number } {
+    return {
+      commitments: [...this.commitments],
+      totalSpent: this.spentAmount,
+      nonce: this.nonce,
+    };
+  }
+
+  close(refundAddress: string): { spentAmount: number; refundAmount: number; refundAddress: string } {
+    this.status = 'closed';
+    return {
+      spentAmount: this.spentAmount,
+      refundAmount: this.totalDeposited - this.spentAmount,
+      refundAddress,
+    };
+  }
+
+  getStatus(): string { return this.status; }
+  getSpent(): number { return this.spentAmount; }
+  getRemaining(): number { return this.totalDeposited - this.spentAmount; }
+  getChannelId(): string { return this.channelId; }
+  getCommitmentCount(): number { return this.commitments.length; }
+
+  halt(): boolean {
+    if (this.status !== 'open') return false;
+    this.status = 'closed';
+    return true;
+  }
+}
+
+export class TAPStream {
+  private readonly channelId: string;
+  private readonly maxTokens: number;
+  private tokensCommitted: number = 0;
+  private tokenChain: string[] = [];
+  private halted: boolean = false;
+  private readonly pricePerToken: number;
+
+  constructor(channelId: string, maxTokens: number, pricePerToken: number = 100) {
+    this.channelId = channelId;
+    this.maxTokens = maxTokens;
+    this.pricePerToken = pricePerToken;
+  }
+
+  commitToken(tokenId: number, secret: string): TokenCommitment {
+    if (this.halted) throw new Error('Stream halted');
+    if (this.tokensCommitted >= this.maxTokens) throw new Error('Max tokens reached');
+    const hash = this.simpleHash(`${secret}:${this.tokensCommitted}`);
+    this.tokenChain.push(hash);
+    this.tokensCommitted++;
+    const commitment: TokenCommitment = {
+      tokenIndex: this.tokensCommitted - 1,
+      tokenId,
+      amountLamports: this.pricePerToken,
+      nonce: this.tokensCommitted,
+      signature: `tap:${this.channelId}:${this.tokensCommitted}:${hash.slice(0, 16)}`,
+    };
+    return commitment;
+  }
+
+  halt(): boolean {
+    this.halted = true;
+    return true;
+  }
+
+  isHalted(): boolean { return this.halted; }
+
+  close(): { channelId: string; tokensCommitted: number; tokenChain: string[]; hashRoot: string } {
+    const root = this.tokenChain.length > 0 ? this.tokenChain[this.tokenChain.length - 1] : 'none';
+    return {
+      channelId: this.channelId,
+      tokensCommitted: this.tokensCommitted,
+      tokenChain: [...this.tokenChain],
+      hashRoot: root,
+    };
+  }
+
+  private simpleHash(input: string): string {
+    let hash = 0;
+    for (let i = 0; i < input.length; i++) {
+      hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
+    }
+    return hash.toString(16).padStart(8, '0');
+  }
+}
+
+export interface MPPSubscription {
+  planId: string;
+  tier: string;
+  monthlyUsd: number;
+  tokenAllowance: number;
+  status: 'active' | 'paused' | 'cancelled';
+  startDate: number;
+}
+
+export class MPPStreaming {
+  private subscriptions: Map<string, MPPSubscription> = new Map();
+  private usageRecords: Array<{ planId: string; tokens: number; costUsd: number; timestamp: number }> = [];
+
+  createSubscription(planId: string, tier: string, monthlyUsd: number, tokenAllowance: number): MPPSubscription {
+    const sub: MPPSubscription = {
+      planId,
+      tier,
+      monthlyUsd,
+      tokenAllowance,
+      status: 'active',
+      startDate: Date.now(),
+    };
+    this.subscriptions.set(planId, sub);
+    return sub;
+  }
+
+  recordUsage(planId: string, tokens: number): { costUsd: number; remaining: number } | null {
+    const sub = this.subscriptions.get(planId);
+    if (!sub || sub.status !== 'active') return null;
+    const costUsd = (tokens / sub.tokenAllowance) * sub.monthlyUsd;
+    this.usageRecords.push({ planId, tokens, costUsd, timestamp: Date.now() });
+    return { costUsd, remaining: sub.tokenAllowance - this.usageRecords.filter(r => r.planId === planId).reduce((s, r) => s + r.tokens, 0) };
+  }
+
+  cancelSubscription(planId: string): boolean {
+    const sub = this.subscriptions.get(planId);
+    if (!sub) return false;
+    sub.status = 'cancelled';
+    return true;
+  }
+
+  getSubscriptions(): MPPSubscription[] {
+    return Array.from(this.subscriptions.values());
+  }
+
+  getUsage(planId: string): Array<{ tokens: number; costUsd: number; timestamp: number }> {
+    return this.usageRecords.filter(r => r.planId === planId);
+  }
 }

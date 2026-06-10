@@ -150,7 +150,7 @@ export class SpeculativeDecoder {
       const draftToken = draft.tokens[i];
       const pTarget = probs[draftToken];
       const pDraft = draft.probabilities[i][draftToken];
-      const ratio = pDraft > 0 ? pTarget / pDraft : 0;
+      const ratio = pDraft > 1e-8 ? Math.min(pTarget / pDraft, 10) : 0;
       if (this.nextRandom() < Math.min(1, ratio * this.config.acceptanceThreshold)) {
         acceptedTokens.push(draftToken);
         context.push(draftToken);
@@ -174,10 +174,74 @@ export class SpeculativeDecoder {
     this.stats.totalRounds++;
     this.stats.acceptanceRate = this.stats.totalAcceptedTokens / Math.max(this.stats.totalDraftTokens, 1);
     this.stats.averageAcceptedPerRound = this.stats.totalAcceptedTokens / Math.max(this.stats.totalRounds, 1);
-    this.stats.speedupRatio = this.stats.averageAcceptedPerRound / draft.speculationLen;
+    this.stats.speedupRatio = Math.max(0, this.stats.averageAcceptedPerRound - 1);
     this.emit({ type: 'verification-complete', round: this.round, acceptedCount: acceptedTokens.length, targetTokens: acceptedTokens });
     this.emit({ type: 'round-complete', round: this.round, acceptedCount: acceptedTokens.length });
     return { acceptedTokens, acceptedCount: acceptedTokens.length, rejectionPosition: rejectionPos, resampledToken: resampled, targetProbabilities: targetProbs };
+  }
+
+  verifyParallel(
+    prefixTokens: number[],
+    drafts: DraftResult[],
+    targetLogits: (tokens: number[]) => Float32Array,
+  ): VerificationResult[] {
+    this.round++;
+    const results: VerificationResult[] = [];
+
+    for (const draft of drafts) {
+      const context = [...prefixTokens];
+      const acceptedTokens: number[] = [];
+      let rejectionPos = draft.speculationLen;
+      let resampled = -1;
+      const targetProbs: Float32Array[] = [];
+
+      for (let i = 0; i < draft.speculationLen; i++) {
+        const logits = targetLogits(context);
+        const probs = this.softmax(logits);
+        targetProbs.push(probs);
+        const draftToken = draft.tokens[i];
+        const pTarget = probs[draftToken];
+        const pDraft = draft.probabilities[i][draftToken];
+        const ratio = pDraft > 1e-8 ? Math.min(pTarget / pDraft, 10) : 0;
+        if (this.nextRandom() < Math.min(1, ratio * this.config.acceptanceThreshold)) {
+          acceptedTokens.push(draftToken);
+          context.push(draftToken);
+        } else {
+          rejectionPos = i;
+          const adjusted = new Float32Array(probs.length);
+          let sum = 0;
+          for (let j = 0; j < probs.length; j++) {
+            adjusted[j] = Math.max(0, probs[j] - draft.probabilities[i][j]);
+            sum += adjusted[j];
+          }
+          if (sum > 0) for (let j = 0; j < adjusted.length; j++) adjusted[j] /= sum;
+          resampled = this.sample(adjusted);
+          acceptedTokens.push(resampled);
+          break;
+        }
+      }
+
+      results.push({
+        acceptedTokens,
+        acceptedCount: acceptedTokens.length,
+        rejectionPosition: rejectionPos,
+        resampledToken: resampled,
+        targetProbabilities: targetProbs,
+      });
+    }
+
+    const totalAccepted = results.reduce((s, r) => s + r.acceptedCount, 0);
+    const totalDrafted = drafts.reduce((s, d) => s + d.speculationLen, 0);
+    this.stats.totalDraftTokens += totalDrafted;
+    this.stats.totalAcceptedTokens += totalAccepted;
+    this.stats.totalRounds += drafts.length;
+    this.stats.acceptanceRate = this.stats.totalAcceptedTokens / Math.max(this.stats.totalDraftTokens, 1);
+    this.stats.averageAcceptedPerRound = this.stats.totalAcceptedTokens / Math.max(this.stats.totalRounds, 1);
+    this.stats.speedupRatio = Math.max(0, this.stats.averageAcceptedPerRound - 1);
+
+    this.emit({ type: 'verification-complete', round: this.round, acceptedCount: totalAccepted, targetTokens: results.flatMap(r => r.acceptedTokens) });
+    this.emit({ type: 'round-complete', round: this.round, acceptedCount: totalAccepted });
+    return results;
   }
 
   getRoleForPeer(peerId: string): SpeculativeRole {
@@ -202,6 +266,196 @@ export class SpeculativeDecoder {
     };
   }
 
+  // SPRINTER: Lightweight verifier (~1k params MLP) predicts acceptance before target model
+  private lightVerifier: LightweightVerifier | null = null;
+  private useLightVerifier = false;
+
+  enableLightVerifier(trainingData?: Array<{ draftLogits: Float32Array; targetLogits: Float32Array; accepted: boolean }>): void {
+    this.lightVerifier = new LightweightVerifier();
+    if (trainingData && trainingData.length > 0) {
+      this.lightVerifier.train(trainingData);
+    }
+    this.useLightVerifier = true;
+  }
+
+  disableLightVerifier(): void {
+    this.useLightVerifier = false;
+  }
+
+  // PEARL: Pre-verify one token while drafting
+  preVerify(
+    draftToken: number,
+    draftProb: Float32Array,
+    partialTargetLogits: Float32Array,
+  ): { accepted: boolean; resampled?: number } {
+    const pTarget = partialTargetLogits[draftToken] >= 0
+      ? this.softmax(partialTargetLogits)[draftToken]
+      : 0;
+    const pDraft = draftProb[draftToken];
+    const ratio = pDraft > 1e-8 ? Math.min(pTarget / pDraft, 10) : 0;
+    if (this.nextRandom() < Math.min(1, ratio * this.config.acceptanceThreshold)) {
+      return { accepted: true };
+    }
+    const adjusted = new Float32Array(partialTargetLogits.length);
+    let sum = 0;
+    const targetProbs = this.softmax(partialTargetLogits);
+    for (let j = 0; j < targetProbs.length; j++) {
+      adjusted[j] = Math.max(0, targetProbs[j] - draftProb[j]);
+      sum += adjusted[j];
+    }
+    if (sum > 0) for (let j = 0; j < adjusted.length; j++) adjusted[j] /= sum;
+    return { accepted: false, resampled: this.sample(adjusted) };
+  }
+
+  // PEARL: Post-verify — continue drafting during verification
+  postVerify(
+    prefixTokens: number[],
+    draft: DraftResult,
+    targetLogits: (tokens: number[]) => Float32Array,
+    additionalDraftLen: number = 2,
+  ): { verification: VerificationResult; additionalDraft: DraftResult | null } {
+    const verifierStart = Date.now();
+    const context = [...prefixTokens];
+    const acceptedTokens: number[] = [];
+    let rejectionPos = draft.speculationLen;
+    let resampled = -1;
+    let additionalContext: number[] = [];
+
+    for (let i = 0; i < draft.speculationLen; i++) {
+      const logits = targetLogits(context);
+      const probs = this.softmax(logits);
+      const draftToken = draft.tokens[i];
+      const pTarget = probs[draftToken];
+      const pDraft = draft.probabilities[i][draftToken];
+      const ratio = pDraft > 1e-8 ? Math.min(pTarget / pDraft, 10) : 0;
+      if (this.nextRandom() < Math.min(1, ratio * this.config.acceptanceThreshold)) {
+        acceptedTokens.push(draftToken);
+        context.push(draftToken);
+      } else {
+        rejectionPos = i;
+        const adjusted = new Float32Array(probs.length);
+        let sum = 0;
+        for (let j = 0; j < probs.length; j++) {
+          adjusted[j] = Math.max(0, probs[j] - draft.probabilities[i][j]);
+          sum += adjusted[j];
+        }
+        if (sum > 0) for (let j = 0; j < adjusted.length; j++) adjusted[j] /= sum;
+        resampled = this.sample(adjusted);
+        acceptedTokens.push(resampled);
+        break;
+      }
+    }
+
+    const elapsed = Date.now() - verifierStart;
+    if (elapsed > 10 && additionalDraftLen > 0 && rejectionPos >= draft.speculationLen) {
+      additionalContext = acceptedTokens.slice(-additionalDraftLen);
+    }
+
+    this.stats.totalDraftTokens += draft.speculationLen;
+    this.stats.totalAcceptedTokens += acceptedTokens.length;
+    this.stats.totalRounds++;
+    this.stats.acceptanceRate = this.stats.totalAcceptedTokens / Math.max(this.stats.totalDraftTokens, 1);
+    this.stats.averageAcceptedPerRound = this.stats.totalAcceptedTokens / Math.max(this.stats.totalRounds, 1);
+    this.stats.speedupRatio = Math.max(0, this.stats.averageAcceptedPerRound - 1);
+
+    const verification: VerificationResult = {
+      acceptedTokens,
+      acceptedCount: acceptedTokens.length,
+      rejectionPosition: rejectionPos,
+      resampledToken: resampled,
+      targetProbabilities: [],
+    };
+    const additionalDraft: DraftResult | null = additionalContext.length > 0
+      ? {
+          tokens: [...additionalContext],
+          probabilities: [],
+          speculationLen: additionalContext.length,
+        }
+      : null;
+    return { verification, additionalDraft };
+  }
+
+  // Truncated Sparse Logits Transmission (TSLT) — transmit only top-k logits
+  sparsifyLogits(logits: Float32Array, topK: number = 20): { indices: Uint16Array; values: Float32Array } {
+    const indexed = Array.from(logits).map((v, i) => ({ value: v, index: i }));
+    indexed.sort((a, b) => b.value - a.value);
+    const top = indexed.slice(0, topK);
+    const indices = new Uint16Array(topK);
+    const values = new Float32Array(topK);
+    for (let i = 0; i < topK; i++) {
+      indices[i] = top[i].index;
+      values[i] = top[i].value;
+    }
+    return { indices, values };
+  }
+
+  reconstructLogits(sparse: { indices: Uint16Array; values: Float32Array }, vocabSize: number): Float32Array {
+    const logits = new Float32Array(vocabSize);
+    for (let i = 0; i < sparse.indices.length; i++) {
+      logits[sparse.indices[i]] = sparse.values[i];
+    }
+    return logits;
+  }
+
+  verifyWithLightweight(
+    prefixTokens: number[],
+    draft: DraftResult,
+    targetLogits: (tokens: number[]) => Float32Array,
+  ): VerificationResult {
+    if (!this.lightVerifier || !this.useLightVerifier) {
+      return this.verify(prefixTokens, draft, targetLogits);
+    }
+    const context = [...prefixTokens];
+    const acceptedTokens: number[] = [];
+    let rejectionPos = draft.speculationLen;
+    let resampled = -1;
+    const targetProbs: Float32Array[] = [];
+
+    for (let i = 0; i < draft.speculationLen; i++) {
+      const predictedAccept = this.lightVerifier.predict(draft.probabilities[i]);
+      if (predictedAccept > 0.5) {
+        acceptedTokens.push(draft.tokens[i]);
+        context.push(draft.tokens[i]);
+        if (targetProbs.length === 0) {
+          const logits = targetLogits(context);
+          targetProbs.push(this.softmax(logits));
+        }
+      } else {
+        const logits = targetLogits(context);
+        const probs = this.softmax(logits);
+        targetProbs.push(probs);
+        const draftToken = draft.tokens[i];
+        const pTarget = probs[draftToken];
+        const pDraft = draft.probabilities[i][draftToken];
+        const ratio = pDraft > 1e-8 ? Math.min(pTarget / pDraft, 10) : 0;
+        if (this.nextRandom() < Math.min(1, ratio * this.config.acceptanceThreshold)) {
+          acceptedTokens.push(draftToken);
+          context.push(draftToken);
+        } else {
+          rejectionPos = i;
+          const adjusted = new Float32Array(probs.length);
+          let sum = 0;
+          for (let j = 0; j < probs.length; j++) {
+            adjusted[j] = Math.max(0, probs[j] - draft.probabilities[i][j]);
+            sum += adjusted[j];
+          }
+          if (sum > 0) for (let j = 0; j < adjusted.length; j++) adjusted[j] /= sum;
+          resampled = this.sample(adjusted);
+          acceptedTokens.push(resampled);
+          break;
+        }
+      }
+    }
+
+    this.stats.totalDraftTokens += draft.speculationLen;
+    this.stats.totalAcceptedTokens += acceptedTokens.length;
+    this.stats.totalRounds++;
+    this.stats.acceptanceRate = this.stats.totalAcceptedTokens / Math.max(this.stats.totalDraftTokens, 1);
+    this.stats.averageAcceptedPerRound = this.stats.totalAcceptedTokens / Math.max(this.stats.totalRounds, 1);
+
+    return { acceptedTokens, acceptedCount: acceptedTokens.length, rejectionPosition: rejectionPos, resampledToken: resampled, targetProbabilities: targetProbs };
+  }
+
   private softmax(logits: Float32Array): Float32Array {
     const max = logits.length > 0 ? Math.max(...Array.from(logits)) : 0;
     let sum = 0;
@@ -222,5 +476,87 @@ export class SpeculativeDecoder {
       if (r < cumSum) return i;
     }
     return probs.length - 1;
+  }
+}
+
+export class LightweightVerifier {
+  private w1: Float32Array;
+  private w2: Float32Array;
+  private b1: Float32Array;
+  private b2: Float32Array;
+  private readonly hiddenDim: number = 32;
+
+  constructor() {
+    this.hiddenDim = 32;
+    const inputDim = 10;
+    this.w1 = new Float32Array(inputDim * this.hiddenDim);
+    this.w2 = new Float32Array(this.hiddenDim * 2);
+    this.b1 = new Float32Array(this.hiddenDim);
+    this.b2 = new Float32Array(2);
+    this.initWeights();
+  }
+
+  private initWeights(): void {
+    const scale1 = Math.sqrt(2 / 10);
+    for (let i = 0; i < this.w1.length; i++) this.w1[i] = (Math.random() - 0.5) * 2 * scale1;
+    const scale2 = Math.sqrt(2 / this.hiddenDim);
+    for (let i = 0; i < this.w2.length; i++) this.w2[i] = (Math.random() - 0.5) * 2 * scale2;
+  }
+
+  predict(draftProb: Float32Array): number {
+    const input = new Float32Array(10);
+    const top = Array.from(draftProb).map((v, i) => ({ v, i })).sort((a, b) => b.v - a.v).slice(0, 10);
+    for (let i = 0; i < top.length; i++) input[i] = top[i].v;
+    const h = new Float32Array(this.hiddenDim);
+    for (let i = 0; i < this.hiddenDim; i++) {
+      let s = this.b1[i];
+      for (let j = 0; j < 10; j++) s += this.w1[j * this.hiddenDim + i] * input[j];
+      h[i] = Math.max(0, s);
+    }
+    let out0 = this.b2[0];
+    let out1 = this.b2[1];
+    for (let i = 0; i < this.hiddenDim; i++) {
+      out0 += this.w2[i * 2] * h[i];
+      out1 += this.w2[i * 2 + 1] * h[i];
+    }
+    const max = Math.max(out0, out1);
+    const exp0 = Math.exp(out0 - max);
+    const exp1 = Math.exp(out1 - max);
+    return exp1 / (exp0 + exp1);
+  }
+
+  train(samples: Array<{ draftLogits: Float32Array; targetLogits: Float32Array; accepted: boolean }>): void {
+    const lr = 0.01;
+    for (const s of samples) {
+      const pred = this.predict(s.draftLogits);
+      const target = s.accepted ? 1 : 0;
+      const error = pred - target;
+      const input = new Float32Array(10);
+      const top = Array.from(s.draftLogits).map((v, i) => ({ v, i })).sort((a, b) => b.v - a.v).slice(0, 10);
+      for (let i = 0; i < top.length; i++) input[i] = top[i].v;
+      const h = new Float32Array(this.hiddenDim);
+      const preH = new Float32Array(this.hiddenDim);
+      for (let i = 0; i < this.hiddenDim; i++) {
+        let sVal = this.b1[i];
+        for (let j = 0; j < 10; j++) sVal += this.w1[j * this.hiddenDim + i] * input[j];
+        preH[i] = sVal;
+        h[i] = Math.max(0, sVal);
+      }
+      const grad = error * pred * (1 - pred);
+      for (let i = 0; i < this.hiddenDim; i++) {
+        this.b2[0] -= lr * grad * h[i] * this.w2[i * 2];
+        this.b2[1] -= lr * grad * h[i] * this.w2[i * 2 + 1];
+        for (let j = 0; j < 2; j++) {
+          this.w2[i * 2 + j] -= lr * grad * h[i];
+        }
+      }
+      for (let i = 0; i < this.hiddenDim; i++) {
+        const dh = grad * (this.w2[i * 2] + this.w2[i * 2 + 1]) * (preH[i] > 0 ? 1 : 0);
+        this.b1[i] -= lr * dh;
+        for (let j = 0; j < 10; j++) {
+          this.w1[j * this.hiddenDim + i] -= lr * dh * input[j];
+        }
+      }
+    }
   }
 }

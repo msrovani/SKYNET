@@ -11,7 +11,7 @@ describe('E2E: AgentHost + SemanticRouter', () => {
     const host = new AgentHost({ maxAgents: 5 });
     const router = new SemanticRouter(64);
 
-    const agent = host.spawnAgent('webdesign', 'e2e-web-1');
+    const agent = await host.spawnAgent('webdesign', 'e2e-web-1');
     expect(agent.templateName).toBe('webdesign');
 
     router.registerAgent({
@@ -27,7 +27,7 @@ describe('E2E: AgentHost + SemanticRouter', () => {
       domain: 'webdesign',
     });
 
-    const output = host.executeAgent('e2e-web-1', { prompt: 'Build a landing page', context: ['dark theme'] });
+    const output = await host.executeAgent('e2e-web-1', { prompt: 'Build a landing page', context: ['dark theme'] });
     expect(output).not.toBeNull();
     expect(output!.content).toContain('Build a landing page');
     expect(output!.confidence).toBeGreaterThan(0);
@@ -48,11 +48,11 @@ describe('E2E: AgentHost + SemanticRouter', () => {
 
   it('supports multi-agent concurrent execution', async () => {
     const host = new AgentHost({ maxAgents: 10 });
-    const web = host.spawnAgent('webdesign', 'multi-web');
-    const writer = host.spawnAgent('content-writer', 'multi-writer');
+    await host.spawnAgent('webdesign', 'multi-web');
+    await host.spawnAgent('content-writer', 'multi-writer');
 
-    const webResult = host.executeAgent('multi-web', { prompt: 'Build site', context: [] });
-    const writerResult = host.executeAgent('multi-writer', { prompt: 'Write article', context: [] });
+    const webResult = await host.executeAgent('multi-web', { prompt: 'Build site', context: [] });
+    const writerResult = await host.executeAgent('multi-writer', { prompt: 'Write article', context: [] });
 
     expect(webResult!.agentId).toBe('multi-web');
     expect(writerResult!.agentId).toBe('multi-writer');
@@ -64,9 +64,9 @@ describe('E2E: AgentHost + SemanticRouter', () => {
 
   it('enforces max agent limit', async () => {
     const host = new AgentHost({ maxAgents: 2 });
-    host.spawnAgent('webdesign', 'a1');
-    host.spawnAgent('content-writer', 'a2');
-    expect(() => host.spawnAgent('webdesign', 'a3')).toThrow('Max agents');
+    await host.spawnAgent('webdesign', 'a1');
+    await host.spawnAgent('content-writer', 'a2');
+    await expect(host.spawnAgent('webdesign', 'a3')).rejects.toThrow('Max agents');
     host.stopAll();
   });
 });

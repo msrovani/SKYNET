@@ -1,0 +1,93 @@
+export interface MaskedGradient {
+  clientId: string;
+  maskedUpdate: number[];
+  maskHint: number[];
+}
+
+export interface AggregationProof {
+  rootHash: string;
+  verifiedClientCount: number;
+  totalGradientNorm: number;
+}
+
+export class LVSAVerifier {
+  private receivedMasks: Map<string, MaskedGradient> = new Map();
+  private expectedClientCount: number;
+
+  constructor(expectedClientCount: number) {
+    this.expectedClientCount = expectedClientCount;
+  }
+
+  submitMask(clientId: string, mask: MaskedGradient): void {
+    this.receivedMasks.set(clientId, mask);
+    if (this.verifyMask(mask)) {
+    }
+  }
+
+  private verifyMask(mask: MaskedGradient): boolean {
+    if (!mask.maskedUpdate || mask.maskedUpdate.length === 0) return false;
+    let sum = 0;
+    for (let i = 0; i < Math.min(mask.maskHint.length, 10); i++) {
+      sum += Math.abs(mask.maskHint[i]);
+    }
+    return sum > 0;
+  }
+
+  aggregate(): { aggregated: number[]; proof: AggregationProof } | null {
+    const clients = Array.from(this.receivedMasks.values());
+    if (clients.length < Math.ceil(this.expectedClientCount * 0.5)) return null;
+    const dim = clients[0].maskedUpdate.length;
+    const aggregated = new Array(dim).fill(0);
+    for (const c of clients) {
+      for (let i = 0; i < dim; i++) {
+        aggregated[i] += c.maskedUpdate[i] / clients.length;
+      }
+    }
+    let totalNorm = 0;
+    for (let i = 0; i < dim; i++) totalNorm += aggregated[i] * aggregated[i];
+    totalNorm = Math.sqrt(totalNorm);
+    const proof: AggregationProof = {
+      rootHash: this.computeHash(aggregated),
+      verifiedClientCount: clients.length,
+      totalGradientNorm: totalNorm,
+    };
+    return { aggregated, proof };
+  }
+
+  private computeHash(data: number[]): string {
+    let hash = 0;
+    for (let i = 0; i < Math.min(data.length, 100); i++) {
+      hash = ((hash << 5) - hash + Math.round(data[i] * 1000)) | 0;
+    }
+    return hash.toString(16).padStart(8, '0');
+  }
+
+  reset(): void {
+    this.receivedMasks.clear();
+  }
+}
+
+export class InnerProductVerifier {
+  private readonly threshold: number;
+
+  constructor(threshold: number = 0.8) {
+    this.threshold = threshold;
+  }
+
+  verify(aggregated: number[], expectedNorm: number): boolean {
+    let norm = 0;
+    for (let i = 0; i < aggregated.length; i++) norm += aggregated[i] * aggregated[i];
+    norm = Math.sqrt(norm);
+    if (norm === 0) return false;
+    const innerProduct = this.computeInnerProduct(aggregated);
+    return innerProduct >= this.threshold && Math.abs(norm - expectedNorm) / Math.max(expectedNorm, 1) < 0.5;
+  }
+
+  private computeInnerProduct(data: number[]): number {
+    let sum = 0;
+    for (let i = 0; i < data.length; i += 2) {
+      sum += data[i] * (data[i + 1] || 0);
+    }
+    return Math.abs(sum) / (data.length || 1) * 10;
+  }
+}

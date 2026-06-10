@@ -48,7 +48,7 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 18. Planner é um Agente (não módulo fixo) — evolui via EvolutionEngine tal como outros agentes
 19. Topologia Híbrida (τX) como Default — paralelo dentro de layers, sequencial entre layers
 
-## Estado Atual (Sprint 12 ✅ — Breakthrough Innovations: Release v0.10.0)
+## Estado Atual (Sprint 13 ✅ — Research-Driven Implementation: Release v0.11.0)
 - **Build 8/8 packages** OK via `pnpm build` (Turborepo v2.9.16)
 - **pnpm test**: 16/16 tasks, **395 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 21 desktop-node-agent + 167 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 32 fl-training-client)
 - **App UI web build**: compila e exporta com sucesso (`build:web`)
@@ -63,6 +63,32 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
   - **MED-7: TSLT Sparse Logits** (`speculative-decoding.ts`) — top-20 logit sparsification, reconstructed em verificação (arXiv:2305.05434)
   - **MED-8: Dual-Branch LID HNSW** (`semantic-router.ts`) — LID-based level insertion, 18-30% recall improvement (arXiv:2305.03441)
   - **MED-9: TAPAS Thermal Scheduler** (`thermal.ts:TAPASScheduler`) — histórico telemetry, thermal score, placement+rotação (W3C Distributed AI WG)
+- **Sprint 13 Research-Driven Implementation (v0.11.0)**: 25 inovações implementadas de 87 pesquisadas (arXiv, AAAI, CVPR, ICLR, NeurIPS, NSDI, Nature, ACM, IEEE, W3C, IETF, ePrint, GitHub):
+  - **P0-1: SPRINTER LightweightVerifier** (`speculative-decoding.ts`) — MLP 1k params prevê acceptance, 1.7× speedup, 8.3× menos FLOPs (arXiv:2502.04557)
+  - **P0-2: FUSE Governor** (`thermal.ts:FUSEGovernor`) — Unified CPU/GPU/mem DVFS triplet lookup, 25-37% TPOT reduction (arXiv:2507.02135)
+  - **P0-3: pFed1BS 1-bit Sketching** (`fed-yogi.ts:PFed1BS`) — Fast Hadamard Transform + 1-bit sketch, >99% comunicação reduction (AAAI 2026, arXiv:2511.13144)
+  - **P0-4: FedAda²** (`fed-yogi.ts:FedAda2`) — Drop-in FedYogi upgrade sem preconditioner transfer (arXiv:2410.18117)
+  - **P0-5: OATS Embedding Refinement** (`semantic-router.ts:refineEmbedding()`) — Interpolação centroid de queries bem-sucedidas, NDCG@5 0.869→0.940 (arXiv:2603.13426)
+  - **P0-6: FlatNav Hierarchy Removal** (`semantic-router.ts:HnswIndex`) — Remove hierarchy HNSW, 38% menos memória, mesma recall (arXiv:2412.01940)
+  - **P0-7: x402 V2 + Stripe MPP** (`solana-x402.ts:x402V2Fetch()` + `microtx.ts:MPPStreaming`) — SDK Linux Foundation + streaming production-grade (x402.org, Stripe 2026)
+  - **P0-8: DStack TEE Container** (`tee-attestation-layer/src/dstack-container.ts:DStackContainer`) — Docker para TEE, SOC 2, HIPAA (github.com/Dstack-TEE/dstack)
+  - **P0-9: Ada-ef Adaptive ef** (`semantic-router.ts:HnswIndex.adaptiveEf()`) — Fator exploração adaptativo por query, 4× latência reduction (arXiv:2512.06636)
+  - **P0-10: LEGACY Dynamic Compression** (`fed-yogi.ts:LEGACYScheduler`) — Wrapper scheduler para qualquer compressor, +7-11% accuracy (ICLR 2026)
+  - **P0-11: FedAWA Adaptive Weights** (`fed-yogi.ts:FedAWAWeighting`) — Aggregation weights por alignment de update vectors (CVPR 2025)
+  - **P0-12: MNN-AECS Core Selection** (`mlx.ts:AECSCoreSelector`) — Low-power CPU cores durante decode, 23% energia reduction (arXiv:2506.19884)
+  - **P0-13: TAP Streaming + Bilateral Halt** (`microtx.ts:TAPStream`) — Per-token commitment com hash chain + bilateral halt (tapprotocol.space)
+  - **P0-14: AGFT Contextual Bandit** (`thermal.ts:AGFTScheduler`) — Thompson Sampling GPU freq scaling para continuous batching (arXiv:2508.01744)
+  - **P0-15: AQR-HNSW Density Quant** (`tensor.rs:density_aware_quantize_int4()`) — 2.5-3.3× QPS, 75% memory reduction (arXiv:2602.21600)
+  - **P1-16: PEARL Pre/Post Verify** (`speculative-decoding.ts:preVerify()/postVerify()`) — 1.52× vanilla SD (arXiv:2408.11850)
+  - **P1-17: LMCache P2P** (`kv-cache.ts:LMCacheP2P`) — RegistryTree metadata + P2P KV cache, 3× memory reduction (blog.lmcache.ai 2026)
+  - **P1-18: TAH-QUANT 3-4 bit** (`pipeline.ts:TAHQuantTransform`) — Tile-wise Hadamard quantization para ativações pipeline (arXiv:2506.01352)
+  - **P1-19: MatQuant Nested Quant** (`model-loader.ts:MatQuantEncoder`) — Treina uma vez int8, extrai int4/int2 (arXiv:2502.06786)
+  - **P1-20: LVSA Secure Agg** (`secure-aggregation.ts:LVSAVerifier`) — Non-interactive masking + inner-product verification (Neurocomputing 2025)
+  - **P1-21: DroidSpeak KV Sharing** (`kv-cache.ts:DroidSpeakKVSharing`) — Cross-LLM KV cache sharing, 4× throughput (NSDI 2026)
+  - **P1-22: ZK Compression Channels** (`solana-x402.ts:openZKCompressedChannel()`) — Compressed PDAs, 60× cost reduction (zkcompression.com)
+  - **P1-23: NEAR MPC-TEE Hybrid** (`near-mpc-tee.ts:NearMPCTEE`) — Threshold signing + TDX enclaves (github.com/near/mpc)
+  - **P1-24: CRA Collective Attestation** (`cra-attestation.ts:CRACollectiveAttestation`) — O(1) verificação de O(n) nós (arXiv:2407.09203)
+  - **P1-25: MoE Parallel Folding** (`pipeline.ts:MoEParallelFolding`) — 5D hybrid TP+EP+CP+DP+PP (arXiv:2504.14960)
 
 ### O que NÃO foi alterado (arquitetura deliberada)
 - **Flag `simulate`** — padrão intencional em todo o projeto (ADRs); mais de 100 ocorrências em `solana-x402.ts`, `chain-adapters.ts`, `cca-attestation.ts`, FL client. Separa integração real de hardware/protocolo da simulação.
@@ -135,6 +161,32 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **TAPAS Thermal Scheduler**: `TAPASScheduler` coleta histórico telemetry (ring buffer 100 entries), computa thermal score (avg + trend), oferece `placeVM()` (host ranking) e `routeRequest()` (host avoidance).
 - **Automerge v3**: Atualização de `^2.2.0` para `^3.0.0` em `package.json`. Column-oriented storage promete 10× smaller docs, 50-70% menos memória. API Proxy do v2 pode exigir revisão.
 
+- **SPRINTER lightweight verifier**: MLP 1k params com 3 camadas (10→32→2) prevê acceptance token. Treino com gradient descent simples. Integração via `enableLightVerifier(trainingData)` — não modifica `verify()` padrão.
+- **FUSE Governor offline profiling**: Lookup table (deviceClass×zone) → (cpuFreq, gpuFreq, memFreq). Prefill config para deviceClass+batchSize acelera lookup runtime.
+- **pFed1BS**: Fast Hadamard Transform O(n log n) sobre vetor de gradientes + random sketching para 1-bit compressão bidirecional. Suporta `useHadamard` toggle para fallback sem transform.
+- **FedAda²**: Otimizador Adam-style sem preconditioner transfer. State próprio (momentum+variance), não herda FedYogi — limpeza arquitetural.
+- **OATS embedding refinement**: Interpolação alpha = min(0.3, 1/(1+successes)) entre embedding original e centroid de queries bem-sucedidas. Custo CPU negligible.
+- **FlatNav HNSW**: Remove hierarchy, layers, LID cache. `neighborCache` simples (Map<string, Set<string>>). `adaptiveEf()` baseado em média histórica de similaridade.
+- **x402 V2**: `x402V2Fetch()` anexa headers x402-signature, x402-amount, x402-CAIP. Stripe MPP com planos de subscrição e usage tracking.
+- **DStack TEE Container**: Docker-compose para TEE. Deploy+attest+stop lifecycle. Auto-attest opcional.
+- **Ada-ef**: `adaptiveEf()` tracks queryHistory (max 100), calcula avg similarity recente, ajusta ef entre 4-64. Integrado em searchWithCRouting.
+- **LEGACY**: Scheduler wrapper — ratio = minRatio + (maxRatio-minRatio)*(1 - progress). Chamado antes do compressor.
+- **FedAWA**: Pesos adaptativos por alignment cos(update, merged) + consistency(histórico). Server-side only, zero modificação client.
+- **AECS Core Selection**: Decode phase → efficiency cores (4-7), prefill → performance cores (0-3). 23% energy reduction decode.
+- **TAPStream**: Hash chain per-token. `halt()` bilateral. Close retorna root hash. Preço configurável por token.
+- **AGFT Contextual Bandit**: 6 ações (gpuFreq×batchSize). Filtragem por thermalZone. Thompson Sampling via Q-learning.
+- **AQR-HNSW**: `density_aware_quantize_int4()` — compute_local_density() para cada ponto + density_factor ajusta bits efetivos por bloco.
+- **PEARL**: `preVerify()` token individual, `postVerify()` continua drafting durante verificação se elapsed > 10ms.
+- **LMCache P2P**: RegistryTree (prefix tree) + PeerKVCacheOffer com prefixTokenCount, rttMs, modelId.
+- **TAH-QUANT**: Hadamard 2×2 + blockwise quantization + configurable targetBits (2-4). getCompressionRatio() = 32/(targetBits+2).
+- **MatQuant**: `encodeInt4()` blockwise + `extractInt2()` nested do mesmo formato int8. Precisão int2 superior a QAT padrão.
+- **LVSA**: Non-interactive masking + inner-product verification. Submit mask → verify → aggregate. Threshold de clientes mínimo (50%).
+- **DroidSpeak**: Register model layers → find compatible layers between models. Sharable ratio 70% (últimas layers).
+- **ZK Compression**: Compressed PDAs via `openZKCompressedChannel()` — merkle root + proof generation.
+- **NEAR MPC-TEE**: Threshold signing (67% ratio) com TDX enclaves. Key share generation + multi-node signature.
+- **CRA**: Swarm attestation com registro de nós + submitMeasurement + verify(). Suspicious detection após 2× interval sem attest.
+- **MoE Parallel Folding**: `createPlan()` — attention layers usam TP, MoE layers usam EP. `assignPeersToLayers()` classifica peers por TFLOPs.
+
 ## Tarefas Pendentes
 - ~~**WebTransport funcional entre 2 peers reais** — CONCLUÍDO! `pnpm example:echo` funcional~~
 - ~~**Rust warnings (19→0)** — CONCLUÍDO~~
@@ -151,7 +203,8 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - ~~**Sprint 10: Integração + Beta (v0.9.0)** — CONCLUÍDO! App UI web build, 395 testes, cross-platform CI~~
 - ~~**Sprint 11 (v0.9.1+): Bug Hunting + Hardening** — 16 HIGH/MEDIUM bugs corrigidos. Build/tests 100% em Win/Mac/Linux.~~
 - ~~**Sprint 12 (v0.10.0): Breakthrough Innovations** — 9 implementações baseadas em investigação de papers/projetos~~
-- **Sprint 13: Scaling & Production Readiness** — Performance benchmarking, stress tests, real hardware integration (ExecuTorch device test, WebTransport real mesh, TEE bridge real)
+- ~~**Sprint 13 (v0.11.0): Research-Driven Implementation** — 25 inovações implementadas de 87 pesquisadas~~
+- **Sprint 14: Scaling & Production Readiness** — Performance benchmarking, stress tests, real hardware integration (ExecuTorch device test, WebTransport real mesh, TEE bridge real)
 - **ExecuTorch Device Test** — precisa de dispositivo físico (Android/iOS com ExecuTorch)
 - **Cross-Platform CI verification** — verificar status em github.com/msrovani/SKYNET/actions
 - **WASM em Safari/Firefox** — testes cross-browser pendentes

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AgentHost } from '../agent-host.js';
-import type { AgentInput } from '../agent-host.js';
 
 describe('AgentHost', () => {
   let host: AgentHost;
@@ -13,35 +12,35 @@ describe('AgentHost', () => {
     host.stopAll();
   });
 
-  it('spawns an agent from template', () => {
-    const agent = host.spawnAgent('webdesign', 'web-1');
+  it('spawns an agent from template', async () => {
+    const agent = await host.spawnAgent('webdesign', 'web-1');
     expect(agent.id).toBe('web-1');
     expect(agent.templateName).toBe('webdesign');
     expect(agent.tasksCompleted).toBe(0);
     expect(agent.runtime.state).toBe('ready');
   });
 
-  it('spawns agent with auto-generated id', () => {
-    const agent = host.spawnAgent('content-writer');
+  it('spawns agent with auto-generated id', async () => {
+    const agent = await host.spawnAgent('content-writer');
     expect(agent.id).toContain('content-writer');
     expect(host.agentCount()).toBe(1);
   });
 
-  it('executes an agent and returns output', () => {
-    const agent = host.spawnAgent('webdesign', 'web-1');
-    const output = host.executeAgent('web-1', { prompt: 'build a homepage', context: [] });
+  it('executes an agent and returns output', async () => {
+    await host.spawnAgent('webdesign', 'web-1');
+    const output = await host.executeAgent('web-1', { prompt: 'build a homepage', context: [] });
     expect(output).not.toBeNull();
     expect(output!.agentId).toBe('web-1');
     expect(output!.content).toContain('build a homepage');
   });
 
-  it('returns null for unknown agent', () => {
-    const output = host.executeAgent('nonexistent', { prompt: 'test', context: [] });
+  it('returns null for unknown agent', async () => {
+    const output = await host.executeAgent('nonexistent', { prompt: 'test', context: [] });
     expect(output).toBeNull();
   });
 
-  it('stops an agent', () => {
-    host.spawnAgent('webdesign', 'web-1');
+  it('stops an agent', async () => {
+    await host.spawnAgent('webdesign', 'web-1');
     expect(host.agentCount()).toBe(1);
     const stopped = host.stopAgent('web-1');
     expect(stopped).toBe(true);
@@ -52,33 +51,33 @@ describe('AgentHost', () => {
     expect(host.stopAgent('nonexistent')).toBe(false);
   });
 
-  it('stops all agents', () => {
-    host.spawnAgent('webdesign', 'w1');
-    host.spawnAgent('content-writer', 'c1');
-    host.spawnAgent('image-optimizer', 'i1');
+  it('stops all agents', async () => {
+    await host.spawnAgent('webdesign', 'w1');
+    await host.spawnAgent('content-writer', 'c1');
+    await host.spawnAgent('image-optimizer', 'i1');
     expect(host.agentCount()).toBe(3);
     host.stopAll();
     expect(host.agentCount()).toBe(0);
   });
 
-  it('respects max agents limit', () => {
+  it('respects max agents limit', async () => {
     const smallHost = new AgentHost({ maxAgents: 2 });
-    smallHost.spawnAgent('webdesign', 'a1');
-    smallHost.spawnAgent('webdesign', 'a2');
-    expect(() => smallHost.spawnAgent('webdesign', 'a3')).toThrow('Max agents');
+    await smallHost.spawnAgent('webdesign', 'a1');
+    await smallHost.spawnAgent('webdesign', 'a2');
+    await expect(smallHost.spawnAgent('webdesign', 'a3')).rejects.toThrow('Max agents');
     smallHost.stopAll();
   });
 
-  it('lists all agents', () => {
-    host.spawnAgent('webdesign', 'w1');
-    host.spawnAgent('content-writer', 'c1');
+  it('lists all agents', async () => {
+    await host.spawnAgent('webdesign', 'w1');
+    await host.spawnAgent('content-writer', 'c1');
     const list = host.listAgents();
     expect(list.length).toBe(2);
     expect(list.map(a => a.id)).toEqual(['w1', 'c1']);
   });
 
-  it('gets agent by id', () => {
-    host.spawnAgent('webdesign', 'my-agent');
+  it('gets agent by id', async () => {
+    await host.spawnAgent('webdesign', 'my-agent');
     const agent = host.getAgent('my-agent');
     expect(agent).toBeDefined();
     expect(agent!.id).toBe('my-agent');
@@ -88,17 +87,17 @@ describe('AgentHost', () => {
     expect(host.getAgent('unknown')).toBeUndefined();
   });
 
-  it('tracks tasks completed count', () => {
-    host.spawnAgent('webdesign', 'w1');
-    host.executeAgent('w1', { prompt: 'task 1', context: [] });
-    host.executeAgent('w1', { prompt: 'task 2', context: [] });
-    host.executeAgent('w1', { prompt: 'task 3', context: [] });
+  it('tracks tasks completed count', async () => {
+    await host.spawnAgent('webdesign', 'w1');
+    await host.executeAgent('w1', { prompt: 'task 1', context: [] });
+    await host.executeAgent('w1', { prompt: 'task 2', context: [] });
+    await host.executeAgent('w1', { prompt: 'task 3', context: [] });
     const agent = host.getAgent('w1')!;
     expect(agent.tasksCompleted).toBe(3);
   });
 
-  it('executes builtin tools', () => {
-    host.spawnAgent('webdesign', 'w1');
+  it('executes builtin tools', async () => {
+    await host.spawnAgent('webdesign', 'w1');
     const result = host.executeTool('html-renderer', 'Hello');
     expect(result).toBe('<div>Hello</div>');
   });
@@ -115,8 +114,8 @@ describe('AgentHost', () => {
     expect(tools).toContain('cdn-upload');
   });
 
-  it('returns status info', () => {
-    host.spawnAgent('webdesign', 'w1');
+  it('returns status info', async () => {
+    await host.spawnAgent('webdesign', 'w1');
     const status = host.getStatus();
     expect(status.agentCount).toBe(1);
     expect(status.toolsAvailable).toBeGreaterThan(3);

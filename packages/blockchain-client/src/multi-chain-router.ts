@@ -116,7 +116,10 @@ export class MultiChainRouter {
     }
 
     const adapter = this.adapters.get(route.chainName);
-    if (!adapter) return null;
+    if (!adapter) {
+      this.emit({ type: 'bridge-failed', chainName: route.chainName, error: 'no adapter registered' });
+      return null;
+    }
 
     this.emit({ type: 'route-selected', chainName: route.chainName, amountUsd, feeUsd: route.feeUsd });
     this.emit({ type: 'bridge-started', chainName: route.chainName, amountUsd });

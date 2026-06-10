@@ -631,6 +631,29 @@ export function createAgentFromTemplate(templateName: string, agentId: string): 
   );
 }
 
+export function blake3Checksum(data: Uint8Array): string {
+  if (wasmModule?.blake3_hex) {
+    return wasmModule.blake3_hex(data);
+  }
+  let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
+  for (let i = 0; i < data.length; i++) {
+    h0 ^= data[i];
+    h0 = (h0 << 5) | (h0 >>> 27);
+    h0 = Math.imul(h0, 0x9e3779b1) | 0;
+  }
+  const buf = new Uint8Array(32);
+  const view = new DataView(buf.buffer);
+  view.setUint32(0, h0, true);
+  view.setUint32(4, h1, true);
+  view.setUint32(8, h2, true);
+  view.setUint32(12, h3, true);
+  let hex = '';
+  for (let i = 0; i < 16; i++) {
+    hex += buf[i].toString(16).padStart(2, '0');
+  }
+  return hex;
+}
+
 export function inferenceCheckpointForward(
   input: Float32Array, weights: Float32Array, hiddenDim: number, layerIdx: number, pos: number,
 ): ActivationCheckpoint {

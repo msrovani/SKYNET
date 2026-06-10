@@ -80,8 +80,7 @@ export class OpportunisticRouter {
     for (const link of sorted) {
       try {
         if (link.type === 'ip') {
-          const snapshot = new TextEncoder().encode(JSON.stringify({ data: Array.from(data) }));
-          this.crdt.loadSnapshot(snapshot);
+          this.crdt.syncData(data);
           link.lastSuccess = Date.now();
           link.failureCount = 0;
           this.emit({ type: 'transport-selected', transport: 'ip', bytesTransferred: data.length });

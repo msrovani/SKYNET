@@ -1,4 +1,5 @@
 use crate::evolution::{EvolvableParams, EvolutionEngine, FitnessReport};
+use js_sys;
 use serde::{Deserialize, Serialize};
 
 const EVOLUTION_INTERVAL_SECS: u64 = 3600;
@@ -73,8 +74,8 @@ pub struct AutonomousOrchestrator {
     telemetry: TelemetryBuffer,
     current_params: EvolvableParams,
     experiment_params: Option<EvolvableParams>,
-    experiment_start: std::time::Instant,
-    last_evolution: std::time::Instant,
+    experiment_start: f64,
+    last_evolution: f64,
     step_count: u64,
 }
 
@@ -85,8 +86,8 @@ impl AutonomousOrchestrator {
             telemetry: TelemetryBuffer::new(),
             current_params: EvolvableParams::default(),
             experiment_params: None,
-            experiment_start: std::time::Instant::now(),
-            last_evolution: std::time::Instant::now(),
+            experiment_start: js_sys::Date::now(),
+            last_evolution: js_sys::Date::now(),
             step_count: 0,
         }
     }
@@ -103,10 +104,10 @@ impl AutonomousOrchestrator {
             self.evaluate_experiment(&snapshot);
         }
 
-        let elapsed = self.last_evolution.elapsed().as_secs();
+        let elapsed = ((js_sys::Date::now() - self.last_evolution) / 1000.0) as u64;
         if elapsed >= EVOLUTION_INTERVAL_SECS && self.telemetry.len() >= 30 {
             self.run_evolution();
-            self.last_evolution = std::time::Instant::now();
+            self.last_evolution = js_sys::Date::now();
         }
     }
 
@@ -118,7 +119,7 @@ impl AutonomousOrchestrator {
             return;
         }
 
-        let experiment_duration = self.experiment_start.elapsed().as_secs();
+        let experiment_duration = ((js_sys::Date::now() - self.experiment_start) / 1000.0) as u64;
         if experiment_duration >= 600 {
             self.conclude_experiment(snapshot);
         }
@@ -127,7 +128,7 @@ impl AutonomousOrchestrator {
     fn start_experiment(&mut self) {
         let candidate = self.current_params.mutate();
         self.experiment_params = Some(candidate);
-        self.experiment_start = std::time::Instant::now();
+        self.experiment_start = js_sys::Date::now();
     }
 
     fn conclude_experiment(&mut self, _current: &TelemetrySnapshot) {

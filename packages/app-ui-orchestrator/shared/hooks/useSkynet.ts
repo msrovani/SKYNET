@@ -90,7 +90,7 @@ export function useSkynet() {
       case AiMode.LIGHTNING: {
         const agent = createAgentFromTemplate('content-writer', 'lightning-agent');
         await agent.load();
-        const output = agent.execute({ prompt, context: [] });
+        const output = await agent.execute({ prompt, context: [] });
         setResponse(`⚡ ${output.content}`);
         break;
       }
@@ -108,9 +108,12 @@ export function useSkynet() {
           maxTokens: 4096,
         });
         await model.load();
-        const result = await model.generate(prompt);
-        setResponse(`🔬 ${result.content}`);
-        model.unload();
+        try {
+          const result = await model.generate(prompt);
+          setResponse(`🔬 ${result.content}`);
+        } finally {
+          model.unload();
+        }
         break;
       }
 
@@ -142,7 +145,7 @@ export function useSkynet() {
         updateTask('1', { status: 'executing', progress: 0.3 });
         const webAgent = createAgentFromTemplate('webdesign', 'web-agent');
         await webAgent.load();
-        const webOut = webAgent.execute({ prompt, context: [] });
+        const webOut = await webAgent.execute({ prompt, context: [] });
         updateTask('1', { status: 'completed', progress: 1 });
         webAgent.reset();
 
@@ -150,7 +153,7 @@ export function useSkynet() {
         updateTask('2', { status: 'executing', progress: 0.3 });
         const contentAgent = createAgentFromTemplate('content-writer', 'content-agent');
         await contentAgent.load();
-        const contentOut = contentAgent.execute({ prompt, context: [] });
+        const contentOut = await contentAgent.execute({ prompt, context: [] });
         updateTask('2', { status: 'completed', progress: 1 });
         contentAgent.reset();
 
@@ -161,12 +164,16 @@ export function useSkynet() {
 
         // Payment via x402 for agent task
         if (engine) {
-          const payment = await engine.microtx.payForInference('agent-task', 0.001);
-          if (payment.success) {
-            setAppState(prev => ({
-              ...prev,
-              earningsUsd: prev.earningsUsd - 0.001,
-            }));
+          try {
+            const payment = await engine.microtx.payForInference('agent-task', 0.001);
+            if (payment.success) {
+              setAppState(prev => ({
+                ...prev,
+                earningsUsd: prev.earningsUsd - 0.001,
+              }));
+            }
+          } catch {
+            setAppState(prev => ({ ...prev, error: 'Payment failed' }));
           }
         }
 

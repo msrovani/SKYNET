@@ -55,7 +55,10 @@ pub struct InferenceMemoryEstimate {
 }
 
 pub fn build_pipeline_plan(config: &TransformerConfig, host_ids: &[String]) -> PipelinePlan {
-    let num_hosts = host_ids.len().max(1);
+    let num_hosts = host_ids.len();
+    if num_hosts == 0 {
+        return PipelinePlan { config: config.clone(), layer_assignments: vec![], num_hosts: 0 };
+    }
     let total_layers = config.num_layers;
     let mut layer_assignments = Vec::with_capacity(total_layers);
 
@@ -191,6 +194,9 @@ pub fn append_to_kv_cache(
     value: &[f32],
 ) -> Result<(), String> {
     let kv_size = cache.num_heads * cache.head_dim;
+    if kv_size == 0 {
+        return Err("Zero kv_size".to_string());
+    }
     if key.len() != kv_size || value.len() != kv_size {
         return Err("Key/value length mismatch".to_string());
     }
@@ -235,6 +241,9 @@ pub fn compute_attention_shard(
     shard_start: usize,
     shard_end: usize,
 ) -> Result<Vec<f32>, String> {
+    if shard_start >= shard_end || shard_end > num_heads {
+        return Err("Invalid shard range".to_string());
+    }
     let num_shard_heads = shard_end - shard_start;
     if shard_end > num_heads {
         return Err("Shard exceeds num_heads".to_string());
@@ -291,10 +300,10 @@ pub fn compute_ffn_shard(
     shard_start: usize,
     shard_end: usize,
 ) -> Result<Vec<f32>, String> {
-    let shard_ffn = shard_end - shard_start;
-    if shard_ffn == 0 {
-        return Err("Empty shard".to_string());
+    if shard_start >= shard_end {
+        return Err("Empty shard range".to_string());
     }
+    let shard_ffn = shard_end - shard_start;
 
     let mut hidden = vec![0.0f32; shard_ffn];
     for i in shard_start..shard_end {

@@ -108,7 +108,14 @@ export class TransportManager {
     const rtc = new WebRTCFallback();
     await rtc.connect();
     this.connection = rtc;
+    rtc.onMessage((data: Uint8Array) => {
+      for (const handler of this.messageHandlers) {
+        handler(data, 'relay');
+      }
+    });
   }
+
+  private sendWriter: any = null;
 
   async send(data: Uint8Array, peerId: string): Promise<void> {
     if (this.state === 'disconnected') {
@@ -122,12 +129,10 @@ export class TransportManager {
       handler(data, peerId);
     }
     if (this.connection?.datagrams?.writable) {
-      const writer = this.connection.datagrams.writable.getWriter();
-      try {
-        await writer.write(data);
-      } finally {
-        writer.releaseLock();
+      if (!this.sendWriter) {
+        this.sendWriter = this.connection.datagrams.writable.getWriter();
       }
+      await this.sendWriter.write(data);
     }
   }
 

@@ -95,7 +95,7 @@ export class AgentModel {
   private detectToolCalls(content: string): Array<{ tool: string; input: string; output: string }> {
     const calls: Array<{ tool: string; input: string; output: string }> = [];
     for (const tool of this.config.tools) {
-      const regex = new RegExp(`\\[${tool.name}:\\s*([^\\]]+)\\]`, 'g');
+      const regex = new RegExp(`\\[${tool.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\s*([^\\]]+)\\]`, 'g');
       let match;
       while ((match = regex.exec(content)) !== null) {
         calls.push({ tool: tool.name, input: match[1], output: '' });
