@@ -47,7 +47,7 @@ export class CRACollectiveAttestation {
     const node = this.nodes.get(nodeId);
     if (!node) return false;
     const now = Date.now();
-    if (now - node.lastAttested > this.VERIFICATION_INTERVAL_MS * 3) {
+    if (node.lastAttested !== 0 && now - node.lastAttested > this.VERIFICATION_INTERVAL_MS * 3) {
       node.status = 'untrusted';
     }
     node.lastAttested = now;

@@ -118,6 +118,7 @@ export class PFed1BS {
   }
 
   compress(gradients: number[]): Int8Array {
+    if (gradients.length === 0) return new Int8Array(0);
     const n = gradients.length;
     const data = new Float64Array(n);
     for (let i = 0; i < n; i++) data[i] = gradients[i];
