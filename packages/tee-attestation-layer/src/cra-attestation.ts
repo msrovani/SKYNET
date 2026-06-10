@@ -46,12 +46,12 @@ export class CRACollectiveAttestation {
   submitAttestation(nodeId: string, measurementHash: string): boolean {
     const node = this.nodes.get(nodeId);
     if (!node) return false;
-    node.lastAttested = Date.now();
-    node.measurementHash = measurementHash;
     const now = Date.now();
     if (now - node.lastAttested > this.VERIFICATION_INTERVAL_MS * 3) {
       node.status = 'untrusted';
     }
+    node.lastAttested = now;
+    node.measurementHash = measurementHash;
     return true;
   }
 

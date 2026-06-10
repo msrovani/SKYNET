@@ -50,7 +50,7 @@ export class NearMPCTEE {
   async thresholdSign(message: string): Promise<MPCSignatureResult> {
     const verified = this.getVerifiedNodes();
     const threshold = Math.ceil(verified.length * this.THRESHOLD_RATIO);
-    const selected = verified.slice(0, Math.max(threshold, verified.length));
+    const selected = verified.slice(0, Math.min(threshold, verified.length));
     return {
       signature: `mpc_sig_${this.simpleHash(message)}_${Date.now().toString(36)}`,
       signedByNodes: selected.map(n => n.nodeId),

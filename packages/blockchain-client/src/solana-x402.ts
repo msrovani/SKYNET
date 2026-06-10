@@ -228,7 +228,11 @@ export class SolanaX402 {
     if (!channel) throw new Error(`Channel ${channelId} not found`);
     if (channel.finalized) throw new Error('Channel already finalized');
     if (Date.now() > channel.expiresAt) throw new Error('Channel expired');
-    if (channel.balanceLocal < amountLamports) throw new Error('Insufficient channel balance');
+    if (amountLamports < 0) {
+      if (channel.balanceRemote < -amountLamports) throw new Error('Insufficient remote balance for refund');
+    } else {
+      if (channel.balanceLocal < amountLamports) throw new Error('Insufficient channel balance');
+    }
 
     channel.balanceLocal -= amountLamports;
     channel.balanceRemote += amountLamports;

@@ -260,6 +260,7 @@ fn compute_local_density(data: &[f32], point_idx: usize, dim: usize, radius: f32
 
 pub fn density_aware_quantize_int4(weights: &[f32], dim: usize) -> (Vec<u8>, Vec<f32>) {
     let n = weights.len();
+    if dim == 0 || n == 0 { return (vec![], vec![]); }
     let num_points = n / dim;
     let radius = (0.1f32).max(1.0 / (dim as f32).sqrt());
     let mut densities = Vec::with_capacity(num_points);
@@ -278,8 +279,7 @@ pub fn density_aware_quantize_int4(weights: &[f32], dim: usize) -> (Vec<u8>, Vec
         } else {
             1.0
         };
-        let effective_bits = (16.0 * density_factor).round().clamp(4.0, 16.0) as u32;
-        let scale = if (max - min).abs() < 1e-10 { 1.0 } else { (max - min) / ((1u32 << effective_bits) - 1) as f32 };
+        let scale = if (max - min).abs() < 1e-10 { 1.0 } else { (max - min) / 15.0 / density_factor };
         scales.push(min);
         scales.push(scale);
         for (i, &val) in chunk.iter().enumerate() {

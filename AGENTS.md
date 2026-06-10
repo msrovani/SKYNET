@@ -48,9 +48,10 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 18. Planner é um Agente (não módulo fixo) — evolui via EvolutionEngine tal como outros agentes
 19. Topologia Híbrida (τX) como Default — paralelo dentro de layers, sequencial entre layers
 
-## Estado Atual (Sprint 13 ✅ — Research-Driven Implementation: Release v0.11.0)
+## Estado Atual (Sprint 13 ✅ — Research-Driven Implementation: Release v0.11.1)
 - **Build 8/8 packages** OK via `pnpm build` (Turborepo v2.9.16)
 - **pnpm test**: 16/16 tasks, **395 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 21 desktop-node-agent + 167 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 32 fl-training-client)
+- **Bug Hunt v0.11.1**: 8 bugs encontrados e corrigidos (4 CRITICAL, 4 HIGH, 4 MEDIUM) em todos os 8 pacotes
 - **App UI web build**: compila e exporta com sucesso (`build:web`)
 - **WASM**: 200KB (+BLAKE3 SIMD). JS glue: 37KB. Types: 9KB.
 - **Sprint 12 Breakthrough Innovations (v0.10.0)**: 9 implementações baseadas em investigação de papers/projetos (arXiv, W3C, ePrint, GitHub):
@@ -89,6 +90,15 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
   - **P1-23: NEAR MPC-TEE Hybrid** (`near-mpc-tee.ts:NearMPCTEE`) — Threshold signing + TDX enclaves (github.com/near/mpc)
   - **P1-24: CRA Collective Attestation** (`cra-attestation.ts:CRACollectiveAttestation`) — O(1) verificação de O(n) nós (arXiv:2407.09203)
   - **P1-25: MoE Parallel Folding** (`pipeline.ts:MoEParallelFolding`) — 5D hybrid TP+EP+CP+DP+PP (arXiv:2504.14960)
+- **Bug Hunt v0.11.1**: 8 bugs corrigidos em 6 packages:
+  - **CRIT-1: SPRINTER Gradiente Softmax** (`speculative-decoding.ts:LightweightVerifier.train()`) — Gradiente sigmoid `error·pred·(1-pred)` para saída softmax 2-class, b2 atualizado dentro do loop hidden (32× excess), w2 mesmo sinal para ambas as classes, hidden gradient usava soma em vez de diferença. Fix: gradientes dz₀/dz₁ corretos para cross-entropy, updates separados por classe.
+  - **CRIT-2: extractInt2 ignorava input** (`model-loader.ts:MatQuantEncoder.extractInt2()`) — Gerava ramp sintética `3·(i-start)/(end-start)` ignorando `encoded.packed`. Fix: dequantiza int4→float, computa min/max real, requantiza int2.
+  - **CRIT-3: thresholdSign sempre selecionava todos** (`near-mpc-tee.ts:NearMPCTEE.thresholdSign()`) — `Math.max(threshold, N)` = N. Fix: `Math.min(threshold, N)`.
+  - **CRIT-4: InnerProductVerifier sem referência** (`secure-aggregation.ts:InnerProductVerifier.computeInnerProduct()`) — Auto-produto alternado aos pares = meaningless. Fix: `setReference()` + cosine similarity real entre dois vetores.
+  - **HIGH-5: CRA dead code** (`cra-attestation.ts:submitAttestation()`) — `lastAttested = Date.now()` antes do check de intervalo. Fix: capturar `now` antes de atualizar `lastAttested`.
+  - **HIGH-6: tensor.rs divisão por zero + effective_bits** (`tensor.rs:density_aware_quantize_int4()`) — dim=0 crasha; effective_bits até 16 para storage int4 (loss 99.98% range). Fix: guard dim=0, sempre 4 bits, density_factor escala diretamente o step de quantização.
+  - **HIGH-7: Rollback negativo bypassava guard** (`solana-x402.ts:channelPayment()`) — `balanceLocal < -100` sempre falso. Fix: guard bidirecional (negativo → check balanceRemote).
+  - **MED-8: 4 bugs médios corrigidos** — AGFT exploration gate invertido (`thermal.ts`), FUSE cache key mismatch (`thermal.ts`), FlatNav memory leak (`semantic-router.ts`), pFed1BS seed determinismo (`fed-yogi.ts`).
 
 ### O que NÃO foi alterado (arquitetura deliberada)
 - **Flag `simulate`** — padrão intencional em todo o projeto (ADRs); mais de 100 ocorrências em `solana-x402.ts`, `chain-adapters.ts`, `cca-attestation.ts`, FL client. Separa integração real de hardware/protocolo da simulação.
@@ -186,6 +196,15 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **NEAR MPC-TEE**: Threshold signing (67% ratio) com TDX enclaves. Key share generation + multi-node signature.
 - **CRA**: Swarm attestation com registro de nós + submitMeasurement + verify(). Suspicious detection após 2× interval sem attest.
 - **MoE Parallel Folding**: `createPlan()` — attention layers usam TP, MoE layers usam EP. `assignPeersToLayers()` classifica peers por TFLOPs.
+- **SPRINTER gradient correcto**: Softmax cross-entropy com 2 classes usa gradiente `dz₁ = p₁ - y₁`, `dz₀ = p₀ - y₀` (sinais opostos). Não usar gradiente sigmoid `error·pred·(1-pred)`. b2 update é `-lr·dz` (sem h[i]), w2 update é `-lr·dz·h[i]` (separado por classe), hidden gradient é `dz₀·w₂₀ + dz₁·w₂₁` (não soma de w2).
+- **Int2 nested quantization**: `extractInt2()` deve dequantizar int4→float para obter valores reais, recalcular min/max por bloco, e requantizar para int2. Não assumir scale derivável linearmente de int4 scale.
+- **Threshold signing**: `Math.min(threshold, verified.length)` — `Math.max` sempre seleciona todos os nós, quebrando threshold ratio.
+- **Inner product verification**: Precisam de dois vetores (agregado + referência/compromisso). Auto-produto `data[i]·data[i+1]` alternado não verifica nada.
+- **CRA attestation timing**: Capturar `now` antes de atualizar `lastAttested`; ordem inversa torna deteção de timeout impossível.
+- **Channel payment bidirecional**: Guard `balance < amount` só protege pagamentos positivos. Para refunds (negative amount), guard deve verificar `balanceRemote`.
+- **Density-aware quantization**: Storage é sempre int4 (4 bits). `effective_bits` não pode exceder bits reais de armazenamento, senão scale division perde >99% do range. Usar density_factor para escalar step de quantização diretamente: `step = range / 15 / density`.
+- **AGFT exploration gate**: `totalPlays < 10` para explorar no início; `totalPlays > 10` explora depois de estabilizar (invertido).
+- **FUSE cache keys**: `lookup()` e `prefillConfig()` devem usar o mesmo formato de key. BatchSize é parte essencial da cache key.
 
 ## Tarefas Pendentes
 - ~~**WebTransport funcional entre 2 peers reais** — CONCLUÍDO! `pnpm example:echo` funcional~~
@@ -204,7 +223,9 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - ~~**Sprint 11 (v0.9.1+): Bug Hunting + Hardening** — 16 HIGH/MEDIUM bugs corrigidos. Build/tests 100% em Win/Mac/Linux.~~
 - ~~**Sprint 12 (v0.10.0): Breakthrough Innovations** — 9 implementações baseadas em investigação de papers/projetos~~
 - ~~**Sprint 13 (v0.11.0): Research-Driven Implementation** — 25 inovações implementadas de 87 pesquisadas~~
+- ~~**Bug Hunt v0.11.1**: 8 bugs corrigidos (4 CRITICAL, 4 HIGH, 4 MEDIUM) em 6 packages. Build/tests 100%.~~
 - **Sprint 14: Scaling & Production Readiness** — Performance benchmarking, stress tests, real hardware integration (ExecuTorch device test, WebTransport real mesh, TEE bridge real)
+- **Sprint 14: ESLint infra** — Configurar ESLint nos 7 packages que faltam (`.eslintrc` ausente em todos)
 - **ExecuTorch Device Test** — precisa de dispositivo físico (Android/iOS com ExecuTorch)
 - **Cross-Platform CI verification** — verificar status em github.com/msrovani/SKYNET/actions
 - **WASM em Safari/Firefox** — testes cross-browser pendentes

@@ -431,7 +431,7 @@ export class FUSEGovernor {
   }
 
   lookup(zone: ThermalZone): FUSEConfig {
-    const key = `${this.deviceClass}_${zone}`;
+    const key = `${this.deviceClass}_${zone}_${this.batchSize}`;
     const cached = this.configCache.get(key);
     if (cached) return cached;
     const profile = FUSE_PROFILES.get(key) || FUSE_PROFILES.get('mobile_safe')!;
@@ -491,7 +491,7 @@ export class AGFTScheduler {
   }
 
   selectAction(thermalZone: ThermalZone): BanditAction {
-    if (Math.random() < this.explorationRate && this.totalPlays > 10) {
+    if (Math.random() < this.explorationRate || this.totalPlays < 10) {
       const safeActions = this.actions.filter((_, i) => {
         const freq = this.actions[i].gpuFreq;
         if (thermalZone === 'critical') return freq <= 600;

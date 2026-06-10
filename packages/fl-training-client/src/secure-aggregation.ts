@@ -69,9 +69,14 @@ export class LVSAVerifier {
 
 export class InnerProductVerifier {
   private readonly threshold: number;
+  private reference: number[] | null = null;
 
   constructor(threshold: number = 0.8) {
     this.threshold = threshold;
+  }
+
+  setReference(ref: number[]): void {
+    this.reference = ref;
   }
 
   verify(aggregated: number[], expectedNorm: number): boolean {
@@ -79,15 +84,19 @@ export class InnerProductVerifier {
     for (let i = 0; i < aggregated.length; i++) norm += aggregated[i] * aggregated[i];
     norm = Math.sqrt(norm);
     if (norm === 0) return false;
-    const innerProduct = this.computeInnerProduct(aggregated);
+    const innerProduct = this.reference ? this.computeInnerProduct(aggregated, this.reference) : 1;
     return innerProduct >= this.threshold && Math.abs(norm - expectedNorm) / Math.max(expectedNorm, 1) < 0.5;
   }
 
-  private computeInnerProduct(data: number[]): number {
+  private computeInnerProduct(data: number[], reference: number[]): number {
+    const len = Math.min(data.length, reference.length);
     let sum = 0;
-    for (let i = 0; i < data.length; i += 2) {
-      sum += data[i] * (data[i + 1] || 0);
+    for (let i = 0; i < len; i++) {
+      sum += data[i] * reference[i];
     }
-    return Math.abs(sum) / (data.length || 1) * 10;
+    const dataNorm = Math.sqrt(data.reduce((s, v) => s + v * v, 0));
+    const refNorm = Math.sqrt(reference.reduce((s, v) => s + v * v, 0));
+    if (dataNorm === 0 || refNorm === 0) return 0;
+    return sum / (dataNorm * refNorm);
   }
 }

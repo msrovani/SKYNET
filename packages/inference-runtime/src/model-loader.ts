@@ -212,14 +212,26 @@ export class MatQuantEncoder {
       const end = Math.min(start + this.blockSize, n);
       const min = encoded.scales[b * 2];
       const scale = encoded.scales[b * 2 + 1];
-      const int2Scale = scale * 5.0;
-      int2Scales[b * 2] = min;
+      let blockMin = Infinity, blockMax = -Infinity;
+      const dequantized = new Float32Array(end - start);
+      for (let i = start; i < end; i++) {
+        const byteIdx = b * 64 + Math.floor((i - start) / 2);
+        const nibble = ((i - start) % 2 === 0)
+          ? (encoded.packed[byteIdx] & 0x0F)
+          : ((encoded.packed[byteIdx] >> 4) & 0x0F);
+        const val = min + nibble * scale;
+        dequantized[i - start] = val;
+        if (val < blockMin) blockMin = val;
+        if (val > blockMax) blockMax = val;
+      }
+      const int2Scale = (blockMax - blockMin) < 1e-10 ? 1.0 : (blockMax - blockMin) / 3.0;
+      int2Scales[b * 2] = blockMin;
       int2Scales[b * 2 + 1] = int2Scale;
       for (let i = start; i < end; i++) {
         const byteIdx = Math.floor(i / 4);
         const bitShift = (i % 4) * 2;
-        const val = Math.min(3, Math.max(0, Math.round(3 * (i - start) / (end - start - 1 || 1))));
-        int2Packed[byteIdx] = (int2Packed[byteIdx] & ~(3 << bitShift)) | (val << bitShift);
+        const q2 = Math.min(3, Math.max(0, Math.round((dequantized[i - start] - blockMin) / int2Scale)));
+        int2Packed[byteIdx] = (int2Packed[byteIdx] & ~(3 << bitShift)) | (q2 << bitShift);
       }
     }
     return { packed: int2Packed, scales: int2Scales };

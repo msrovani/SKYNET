@@ -530,7 +530,6 @@ export class LightweightVerifier {
     for (const s of samples) {
       const pred = this.predict(s.draftLogits);
       const target = s.accepted ? 1 : 0;
-      const error = pred - target;
       const input = new Float32Array(10);
       const top = Array.from(s.draftLogits).map((v, i) => ({ v, i })).sort((a, b) => b.v - a.v).slice(0, 10);
       for (let i = 0; i < top.length; i++) input[i] = top[i].v;
@@ -542,16 +541,16 @@ export class LightweightVerifier {
         preH[i] = sVal;
         h[i] = Math.max(0, sVal);
       }
-      const grad = error * pred * (1 - pred);
+      const dz1 = pred - target;
+      const dz0 = (1 - pred) - (1 - target);
+      this.b2[0] -= lr * dz0;
+      this.b2[1] -= lr * dz1;
       for (let i = 0; i < this.hiddenDim; i++) {
-        this.b2[0] -= lr * grad * h[i] * this.w2[i * 2];
-        this.b2[1] -= lr * grad * h[i] * this.w2[i * 2 + 1];
-        for (let j = 0; j < 2; j++) {
-          this.w2[i * 2 + j] -= lr * grad * h[i];
-        }
+        this.w2[i * 2] -= lr * dz0 * h[i];
+        this.w2[i * 2 + 1] -= lr * dz1 * h[i];
       }
       for (let i = 0; i < this.hiddenDim; i++) {
-        const dh = grad * (this.w2[i * 2] + this.w2[i * 2 + 1]) * (preH[i] > 0 ? 1 : 0);
+        const dh = (dz0 * this.w2[i * 2] + dz1 * this.w2[i * 2 + 1]) * (preH[i] > 0 ? 1 : 0);
         this.b1[i] -= lr * dh;
         for (let j = 0; j < 10; j++) {
           this.w1[j * this.hiddenDim + i] -= lr * dh * input[j];

@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.11.1] — 2026-06-09 — Bug Hunt v0.11.1
+
+### CRITICAL — Wrong results / security bypass (4)
+
+- **SPRINTER gradient softmax** (`p2p-mesh-network/src/speculative-decoding.ts:528`): `LightweightVerifier.train()` usava gradiente sigmoid `error·pred·(1-pred)` para saída softmax 2-class. b2 atualizado dentro do loop hidden (32× excesso), w2 mesmo sinal para ambas as classes, hidden gradient usava `grad·(w2₀+w2₁)` em vez de `dz₀·w2₀ + dz₁·w2₁`. Fix: gradientes cross-entropy corretos (`dz₁ = p₁-y₁`, `dz₀ = p₀-y₀`), updates separados por classe.
+- **extractInt2 ignorava input** (`inference-runtime/src/model-loader.ts:205`): `MatQuantEncoder.extractInt2()` gerava ramp sintética `3·(i-start)/(end-start)` ignorando `encoded.packed`. Fix: dequantiza int4→float real, computa min/max por bloco, requantiza para int2.
+- **thresholdSign sempre selecionava todos** (`tee-attestation-layer/src/near-mpc-tee.ts:53`): `Math.max(threshold, verified.length)` = N quando `threshold ≤ N`. Threshold ratio de 67% nunca era aplicado. Fix: `Math.min(threshold, verified.length)`.
+- **InnerProductVerifier sem referência** (`fl-training-client/src/secure-aggregation.ts:86`): `computeInnerProduct()` computava auto-produto `data[i]·data[i+1]` alternado — meaningless. Fix: adicionado `setReference()` + cosine similarity real entre dois vetores.
+
+### HIGH — Logic / correctness (4)
+
+- **CRA dead code** (`tee-attestation-layer/src/cra-attestation.ts:49`): `submitAttestation()` definia `node.lastAttested = Date.now()` antes de verificar `now - lastAttested > 180s`, tornando a deteção de untrusted nodes impossível. Fix: capturar `now` antes de atualizar `lastAttested`.
+- **density_aware_quantize_int4 divisão por zero** (`core-wasm-engine/src/tensor.rs:261`): dim=0 crashava; `effective_bits` até 16 para storage int4 causava perda de 99.98% do range de quantização. Fix: guard dim=0, sempre 4 bits, density_factor escala diretamente o step de quantização.
+- **Rollback negativo bypassava guard** (`blockchain-client/src/solana-x402.ts:231`): `channelPayment(channelId, -amount)` — guard `balanceLocal < -100` sempre falso para balances positivos. Fix: guard bidirecional — refunds verificam `balanceRemote`.
+- **LightweightVerifier b2/w2 update** (incluído no CRIT-1): Fix completo descrito acima.
+
+### MEDIUM — Housekeeping (4)
+
+- **AGFT exploration gate invertido** (`p2p-mesh-network/src/thermal.ts:494`): `totalPlays > 10` em vez de `< 10` — sem exploração nos primeiros 10 rounds. Fix: `|| totalPlays < 10`.
+- **FUSE cache key mismatch** (`p2p-mesh-network/src/thermal.ts:434`): `lookup()` usava key `deviceClass_zone` mas `prefillConfig()` usava `deviceClass_zone_batchSize`. Fix: lookup inclui batchSize.
+- **FlatNav memory leak** (`p2p-mesh-network/src/semantic-router.ts:131`): neighborCache nunca limpava sets vazios após `remove()`. Fix: `neighbors.size === 0 → delete`.
+- **pFed1BS seed determinismo** (`fl-training-client/src/fed-yogi.ts:85`): Construtor aceita `seed` opcional para sketching determinístico entre clientes.
+
 ## [0.9.1] — 2026-07-09 — Sprint 11: Bug Hunting + Hardening
 
 ### HIGH — Runtime crashes / data loss (6 TS + 2 Rust)

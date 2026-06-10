@@ -82,12 +82,12 @@ export class PFed1BS {
   private config: SketchConfig;
   private rngState: number;
 
-  constructor(config: Partial<SketchConfig> = {}) {
+  constructor(config: Partial<SketchConfig> & { seed?: number } = {}) {
     this.config = {
       sketchSize: config.sketchSize ?? 256,
       useHadamard: config.useHadamard ?? true,
     };
-    this.rngState = Date.now() & 0x7fffffff;
+    this.rngState = (config.seed ?? Date.now()) & 0x7fffffff;
   }
 
   private nextRandom(): number {

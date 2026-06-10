@@ -129,8 +129,9 @@ export class HnswIndex {
     this.vectors.delete(id);
     this.labels = this.labels.filter(l => l !== id);
     this.neighborCache.delete(id);
-    for (const [, neighbors] of this.neighborCache) {
+    for (const [nId, neighbors] of this.neighborCache) {
       neighbors.delete(id);
+      if (neighbors.size === 0) this.neighborCache.delete(nId);
     }
   }
 
