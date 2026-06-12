@@ -1,59 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { AgentRuntime, createAgentFromTemplate } from '@skynet/core-wasm-engine';
+import { createAgentFromTemplate } from '@skynet/core-wasm-engine';
 import { SolanaX402, MicroTxManager } from '@skynet/blockchain-client';
 import {
   AppState, AiMode, AgentAutonomy, MeshStatus, SilentConfig,
-  AgentTask, AI_MODE_LABELS,
+  AgentTask,
 } from '../types/index';
-
-interface ToolAdapter {
-  name: string;
-  execute: (input: string) => string | Promise<string>;
-  description: string;
-}
-
-interface AgentTurnResult {
-  content: string;
-  toolCalls: Array<{ tool: string; input: string; output: string }>;
-  latencyMs: number;
-}
-
-class MockAgentModel {
-  private tools: ToolAdapter[];
-
-  constructor(config: { agentId: string; modelId: string; systemPrompt: string; tools: ToolAdapter[]; temperature: number; maxTokens: number }) {
-    this.tools = config.tools;
-  }
-
-  async load(): Promise<void> {}
-
-  async generate(prompt: string, _context?: string[]): Promise<AgentTurnResult> {
-    const start = Date.now();
-    const responses = [
-      'Compreendo a sua questão. Analisando os dados disponíveis, posso confirmar que o sistema está operacional e pronto para processar o seu pedido.',
-      'Baseado na minha análise, a resposta mais adequada envolve considerar múltiplos fatores contextuais. Vou detalhar cada um deles.',
-      'Obrigado pela sua pergunta. Através dos meus algoritmos de inferência, cheguei à seguinte conclusão fundamentada.',
-      'Processei a sua solicitação utilizando a rede distribuída. Os resultados indicam uma solução viável para o problema apresentado.',
-    ];
-    const base = responses[Math.floor(Math.random() * responses.length)];
-    let content = `[${prompt.slice(0, 30)}…] ${base}`;
-    const toolCalls: Array<{ tool: string; input: string; output: string }> = [];
-    for (const tool of this.tools) {
-      const regex = new RegExp(`\\[${tool.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\s*([^\\]]+)\\]`, 'g');
-      let match;
-      while ((match = regex.exec(content)) !== null) {
-        toolCalls.push({ tool: tool.name, input: match[1], output: '' });
-      }
-    }
-    for (const tc of toolCalls) {
-      const tool = this.tools.find(t => t.name === tc.tool);
-      if (tool) tc.output = await Promise.resolve(tool.execute(tc.input));
-    }
-    return { content, toolCalls, latencyMs: Date.now() - start };
-  }
-
-  unload(): void {}
-}
 
 const DEFAULT_APP: AppState = {
   mode: AiMode.LIGHTNING,
@@ -70,8 +21,6 @@ const DEFAULT_APP: AppState = {
 };
 
 interface SkynetEngine {
-  agentRuntime: AgentRuntime | null;
-  agentModel: MockAgentModel | null;
   x402: SolanaX402;
   microtx: MicroTxManager;
 }
@@ -103,17 +52,8 @@ export function useSkynet() {
   useEffect(() => {
     const x402 = new SolanaX402({ simulate: true });
     const microtx = new MicroTxManager(x402);
-
-    engineRef.current = {
-      agentRuntime: null,
-      agentModel: null,
-      x402,
-      microtx,
-    };
-
-    return () => {
-      engineRef.current = null;
-    };
+    engineRef.current = { x402, microtx };
+    return () => { engineRef.current = null; };
   }, []);
 
   const setMode = useCallback((mode: AiMode) => {
@@ -135,32 +75,23 @@ export function useSkynet() {
     const engine = engineRef.current;
 
     switch (appState.mode) {
-      case AiMode.LIGHTNING: {
-        const agent = createAgentFromTemplate('content-writer', 'lightning-agent');
-        await agent.load();
-        const output = await agent.execute({ prompt, context: [] });
-        setResponse(`⚡ ${output.content}`);
-        break;
-      }
-
+      case AiMode.LIGHTNING:
       case AiMode.DEEP: {
-        const tools: ToolAdapter[] = [
-          { name: 'text-generator', execute: (s) => s, description: 'Generate text' },
-        ];
-        const model = new MockAgentModel({
-          agentId: 'deep-agent',
-          modelId: 'none',
-          systemPrompt: 'You are a deep reasoning assistant. Think step by step.',
-          tools,
-          temperature: 0.3,
-          maxTokens: 4096,
-        });
-        await model.load();
         try {
-          const result = await model.generate(prompt);
-          setResponse(`🔬 ${result.content}`);
-        } finally {
-          model.unload();
+          const res = await fetch('/api/inference', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt, mode: appState.mode }),
+          });
+          const data = await res.json();
+          const icon = appState.mode === AiMode.LIGHTNING ? '⚡' : '🔬';
+          if (res.ok) {
+            setResponse(`${icon} ${data.content}`);
+          } else {
+            setResponse(`❌ ${data.content}`);
+          }
+        } catch (err) {
+          setResponse(`❌ Erro de rede: ${err instanceof Error ? err.message : 'Falha na ligação'}`);
         }
         break;
       }
@@ -182,14 +113,12 @@ export function useSkynet() {
           setAgentTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } as AgentTask : t));
         };
 
-        // Step 1: Plan
         updateTask('0', { status: 'executing', progress: 0.3 });
         if (autonomy === AgentAutonomy.WATCH || autonomy === AgentAutonomy.ASSIST) {
           await new Promise(r => setTimeout(r, 300));
         }
         updateTask('0', { status: 'completed', progress: 1 });
 
-        // Step 2: Webdesign agent
         updateTask('1', { status: 'executing', progress: 0.3 });
         const webAgent = createAgentFromTemplate('webdesign', 'web-agent');
         await webAgent.load();
@@ -197,7 +126,6 @@ export function useSkynet() {
         updateTask('1', { status: 'completed', progress: 1 });
         webAgent.reset();
 
-        // Step 3: Content agent
         updateTask('2', { status: 'executing', progress: 0.3 });
         const contentAgent = createAgentFromTemplate('content-writer', 'content-agent');
         await contentAgent.load();
@@ -205,12 +133,10 @@ export function useSkynet() {
         updateTask('2', { status: 'completed', progress: 1 });
         contentAgent.reset();
 
-        // Step 4: Aggregate
         updateTask('3', { status: 'executing', progress: 0.5 });
         await new Promise(r => setTimeout(r, 200));
         updateTask('3', { status: 'completed', progress: 1 });
 
-        // Payment via x402 for agent task
         if (engine) {
           try {
             const payment = await engine.microtx.payForInference('agent-task', 0.001);
