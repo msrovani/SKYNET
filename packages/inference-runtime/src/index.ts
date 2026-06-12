@@ -1,3 +1,6 @@
+export { AutoConfig, type AutoModelConfig, type HardwareDevice } from './auto-config.js';
+export { LLaMACppRuntime, type LLaMACppConfig, type LLaMAGenerateResult } from './llamacpp.js';
+export { AgentModel, type AgentModelConfig, type ToolAdapter, type AgentTurnResult } from './agent-model.js';
 export {
   ExecuTorchRuntime,
   getAvailableBackends,
@@ -10,7 +13,6 @@ export {
   type InferenceResult,
   type ModelMetadata,
 } from './executorch.js';
-
 export { MLXRuntime } from './mlx.js';
 export { OnnxRuntimeWeb } from './onnx-runtime.js';
 export {
@@ -22,8 +24,6 @@ export {
   type Quantization,
   type DownloadProgress,
 } from './model-loader.js';
-
-export { AgentModel, type AgentModelConfig, type ToolAdapter, type AgentTurnResult } from './agent-model.js';
 export {
   PluginRegistry, type RegistryEvent, type RegistryEventType, type RegistryCallback,
 } from './plugin-registry.js';
@@ -36,14 +36,12 @@ export {
   type PluginValidation, type PluginManifest, type PluginEntry,
   type PluginSource, type PluginRuntime, type PluginArchitecture,
 } from './plugin-types.js';
-
 export {
   CoreMLRuntime, detectPlatform, recommendDelegate,
   type CoreMLConfig, type CoreMLDelegate,
   type CoreMLMetadata, type CoreMLInferenceResult,
   type CoreMLPlatform,
 } from './coreml.js';
-
 export {
   WebGpuPreprocessor, isWebGpuAvailable, getWebGpuAdapter,
   getAdapterInfo, getTvAdapterInfo,

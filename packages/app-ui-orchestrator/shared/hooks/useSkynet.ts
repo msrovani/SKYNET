@@ -1,11 +1,59 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AgentRuntime, createAgentFromTemplate } from '@skynet/core-wasm-engine';
-import { AgentModel, type ToolAdapter } from '@skynet/inference-runtime';
 import { SolanaX402, MicroTxManager } from '@skynet/blockchain-client';
 import {
   AppState, AiMode, AgentAutonomy, MeshStatus, SilentConfig,
   AgentTask, AI_MODE_LABELS,
 } from '../types/index';
+
+interface ToolAdapter {
+  name: string;
+  execute: (input: string) => string | Promise<string>;
+  description: string;
+}
+
+interface AgentTurnResult {
+  content: string;
+  toolCalls: Array<{ tool: string; input: string; output: string }>;
+  latencyMs: number;
+}
+
+class MockAgentModel {
+  private tools: ToolAdapter[];
+
+  constructor(config: { agentId: string; modelId: string; systemPrompt: string; tools: ToolAdapter[]; temperature: number; maxTokens: number }) {
+    this.tools = config.tools;
+  }
+
+  async load(): Promise<void> {}
+
+  async generate(prompt: string, _context?: string[]): Promise<AgentTurnResult> {
+    const start = Date.now();
+    const responses = [
+      'Compreendo a sua questão. Analisando os dados disponíveis, posso confirmar que o sistema está operacional e pronto para processar o seu pedido.',
+      'Baseado na minha análise, a resposta mais adequada envolve considerar múltiplos fatores contextuais. Vou detalhar cada um deles.',
+      'Obrigado pela sua pergunta. Através dos meus algoritmos de inferência, cheguei à seguinte conclusão fundamentada.',
+      'Processei a sua solicitação utilizando a rede distribuída. Os resultados indicam uma solução viável para o problema apresentado.',
+    ];
+    const base = responses[Math.floor(Math.random() * responses.length)];
+    let content = `[${prompt.slice(0, 30)}…] ${base}`;
+    const toolCalls: Array<{ tool: string; input: string; output: string }> = [];
+    for (const tool of this.tools) {
+      const regex = new RegExp(`\\[${tool.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\s*([^\\]]+)\\]`, 'g');
+      let match;
+      while ((match = regex.exec(content)) !== null) {
+        toolCalls.push({ tool: tool.name, input: match[1], output: '' });
+      }
+    }
+    for (const tc of toolCalls) {
+      const tool = this.tools.find(t => t.name === tc.tool);
+      if (tool) tc.output = await Promise.resolve(tool.execute(tc.input));
+    }
+    return { content, toolCalls, latencyMs: Date.now() - start };
+  }
+
+  unload(): void {}
+}
 
 const DEFAULT_APP: AppState = {
   mode: AiMode.LIGHTNING,
@@ -23,7 +71,7 @@ const DEFAULT_APP: AppState = {
 
 interface SkynetEngine {
   agentRuntime: AgentRuntime | null;
-  agentModel: AgentModel | null;
+  agentModel: MockAgentModel | null;
   x402: SolanaX402;
   microtx: MicroTxManager;
 }
@@ -99,7 +147,7 @@ export function useSkynet() {
         const tools: ToolAdapter[] = [
           { name: 'text-generator', execute: (s) => s, description: 'Generate text' },
         ];
-        const model = new AgentModel({
+        const model = new MockAgentModel({
           agentId: 'deep-agent',
           modelId: 'none',
           systemPrompt: 'You are a deep reasoning assistant. Think step by step.',

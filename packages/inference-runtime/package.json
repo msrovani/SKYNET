@@ -19,11 +19,12 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@skynet/core-wasm-engine": "workspace:*"
+    "@skynet/core-wasm-engine": "workspace:*",
+    "node-llama-cpp": "^3.18.1"
   },
   "devDependencies": {
+    "eslint": "^8.57.0",
     "typescript": "^5.4.0",
-    "vitest": "^1.6.0",
-    "eslint": "^8.57.0"
+    "vitest": "^1.6.0"
   }
 }

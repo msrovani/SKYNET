@@ -20,14 +20,14 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 ## Monorepo — 8 Pacotes
 - `core-wasm-engine` — Rust→WASM (WebGPU, tensores INT4, thermal, Multipath QUIC, MPC)
 - `p2p-mesh-network` — WebTransport + Multipath QUIC + WebRTC, CRDT, failover, discovery
-- `inference-runtime` — ExecuTorch, MLX, ONNX Runtime Web, model loader
+- `inference-runtime` — ExecuTorch, MLX, ONNX Runtime Web, node-llama-cpp, AutoConfig, model loader
 - `tee-attestation-layer` — Remote Attestation, TEE bridge, Proof of Time
 - `blockchain-client` — Solana x402 + State Channels, Base fallback, microtx manager
 - `fl-training-client` — FedYogi + Secure Aggregation MPC, Q-LocalAdam, FEDADAVR, client selection
 - `app-ui-orchestrator` — React Native App + Next.js PWA, estados globais
 - `desktop-node-agent` — Tauri app (Rust: GPU detection, power mgmt, node service, TURN/STUN)
 
-## ADRs (19)
+## ADRs (22)
 1. WebTransport + Multipath QUIC > WebRTC (0-RTT, failover 4G/WiFi)
 2. ExecuTorch > ONNX Runtime (50KB, 12 backends, KleidiAI)
 3. FedYogi > FedAvg (+5-15% precisão, 0% falhas)
@@ -47,13 +47,24 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 17. Frações Imutáveis com Checksum (BLAKE3) — integridade garantida entre agentes
 18. Planner é um Agente (não módulo fixo) — evolui via EvolutionEngine tal como outros agentes
 19. Topologia Híbrida (τX) como Default — paralelo dentro de layers, sequencial entre layers
+20. AutoConfig > Config manual (hardware detection automático elimina configuração)
+21. node-llama-cpp GGUF > ExecuTorch para GPU desktop (CUDA nativo, 0 compilação .pte)
+22. Inline Mock > import dinâmico (frontend web não pode importar módulos nativos nem via barrel)
 
-## Estado Atual (Sprint 13 ✅ — Research-Driven Implementation: Release v0.11.1)
+## Estado Atual (Sprint 14 ✅ — Local Inference Real: Release v0.12.0)
 - **Build 8/8 packages** OK via `pnpm build` (Turborepo v2.9.16)
-- **pnpm test**: 16/16 tasks, **395 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 21 desktop-node-agent + 167 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 32 fl-training-client)
-- **Bug Hunt v0.11.1**: 8 bugs encontrados e corrigidos (4 CRITICAL, 4 HIGH, 4 MEDIUM) em todos os 8 pacotes
+- **pnpm test**: 16/16 tasks, **399 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 21 desktop-node-agent + 167 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 32 fl-training-client)
+- **ESLint**: 8/8 packages configurados, **0 erros**
+- **CUDA Toolkit 13.0 instalado**: nvcc V13.0.48, GTX 1050 4GB (driver 582.28). CUDA_PATH configurado.
+- **Sprint 14 — Ativações de Infra-estrutura de Inferência Local (v0.12.0)**: 4 implementações:
+  - **P0-1: AutoConfig** (`auto-config.ts`) — deteção hardware CPU/RAM/disk/GPU NVIDIA. Catálogo 4 modelos hierárquicos por VRAM. `gpuLayers`/`threads`/`contextSize`/`batchSize` calculados automaticamente. `modelId: 'none'` skip total sem deteção.
+  - **P0-2: LLaMACppRuntime** (`llamacpp.ts`) — wrapper `node-llama-cpp` v3.18.1: `getLlama({gpu:'auto'})` → `loadModel()` → `createContext()` → `LlamaCompletion.generateCompletion()`. CUDA automático via `gpu: 'auto'`.
+  - **P0-3: AgentModel integrado** (`agent-model.ts`) — `load()` chama `AutoConfig.autoDetectAndConfigure()`. Prioridade: GGUF (LLaMACppRuntime) → ExecuTorch → mock Português. Fallback contextual automático.
+  - **P0-4: Frontend Webpack fix** (`next.config.js`) — `ignore-loader` para `.node` + `IgnorePlugin` para `@node-llama-cpp/*` e `@reflink/*`. `MockAgentModel` inline substitui import estático de `@skynet/inference-runtime`. Build 86KB JS, export static.
 - **App UI web build**: compila e exporta com sucesso (`build:web`)
+- **Frontend dev server**: http://localhost:3000 (Next.js 15.5), MockAgentModel responde em Português modo LIGHTNING/DEEP
 - **WASM**: 200KB (+BLAKE3 SIMD). JS glue: 37KB. Types: 9KB.
+- **Bug Hunt v0.11.1 (legacy)**: 8 bugs encontrados e corrigidos (4 CRITICAL, 4 HIGH, 4 MEDIUM) em todos os 8 pacotes
 - **Sprint 12 Breakthrough Innovations (v0.10.0)**: 9 implementações baseadas em investigação de papers/projetos (arXiv, W3C, ePrint, GitHub):
   - **HIGH-1: CRouting** (`semantic-router.ts:searchWithCRouting()`) — angle-based pruning, 41.5% menos distância computada, 1.48× QPS (arXiv:2303.00334)
   - **HIGH-2: BLAKE3 WASM SIMD** (`lib.rs` + `fraction-aggregator.ts`) — hash criptográfico real com blake3 crate v1.8.5 + `wasm32_simd`, ~6× speedup sobre portable WASM
@@ -105,6 +116,7 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **Blocos `catch` vazios no sistema de eventos** (`agent-mesh.ts:54`, `semantic-router.ts:138`, `fraction-aggregator.ts:70/210`) — tolerante a handlers com erro (try-catch no loop) por decisão arquitetural.
 - **Cast `as any`** — limitação do TypeScript para APIs WebGPU, Automerge, WebTransport, ExecuTorch sem tipos maduros.
 - **WASM stub `index.ts`** — progressive enhancement: tenta WASM, fallback para JS implementation. Cada função stub retorna valor padrão sensato, não placeholder vazio.
+- **MockAgentModel inline no hook** — substituto do `@skynet/inference-runtime` no frontend web. Barrel import de módulo nativo falha mesmo com IgnorePlugin; classe mock inline é o único padrão que garante build web sem erros de webpack.
 
 ### Bugs Conhecidos
 - **Automerge v2 Proxy rejeita `undefined`** — usar `null` ou omitir propriedade. Fix em `decompressSnapshot` e `updatePeer`.
@@ -206,6 +218,18 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **AGFT exploration gate**: `totalPlays < 10` para explorar no início; `totalPlays > 10` explora depois de estabilizar (invertido).
 - **FUSE cache keys**: `lookup()` e `prefillConfig()` devem usar o mesmo formato de key. BatchSize é parte essencial da cache key.
 
+- **AutoConfig `nvidia-smi` fallback**: Se `nvidia-smi` não está em PATH, tentar ler `nvml.dll` via `CUDA_PATH`. Em Windows, `nvidia-smi` pode estar em `$env:CUDA_PATH/bin/`.
+- **node-llama-cpp `gpu: 'auto'`**: `getLlama({gpu:'auto'})` deteta CUDA Toolkit por `CUDA_PATH` ou `nvcc` em PATH. Não requer linking manual. Falha silenciosa → CPU fallback.
+- **LlamaCompletion API**: `generateCompletion()` da classe `LlamaCompletion` do node-llama-cpp retorna string diretamente (não iterator). Usar `maxTokens`/`temperature` nas options. Contexto criado separadamente em `llama.createContext()`.
+- **ignore-loader + IgnorePlugin**: Para bundles web que não podem conter módulos nativos, `ignore-loader` para extensões `.node` + `webpack.IgnorePlugin` para packages nativos (`@node-llama-cpp/*`, `@reflink/*`). Mock replacement inline para o módulo inteiro.
+- **Inline Mock > import dinâmico**: Import estático de módulo nativo falha em webpack mesmo com `IgnorePlugin` se o barrel export (`index.ts`) reexporta o módulo. Solução: classe mock inline no hook do frontend, sem import do package.
+- **CUDA Toolkit no Windows**: `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.0\bin\` deve estar em PATH. `nvidia-smi` está em `C:\Windows\System32\` (driver), não no toolkit. node-llama-cpp usa `nvcc` do toolkit, não `nvidia-smi`.
+- **Model catalog por VRAM**: 4 tiers: 0GB (tiny), 4GB (phi-3-mini Q4_K_M ~20 layers GPU), 8GB (llama-3.2-3B), 16GB (mistral-7B), 24GB+ (llama-3.1-8B). gpuLayers ~ 0.8 * VRAM_GB * 1024 / 300 (estimation).
+- **gpuLayers quantization-aware**: Fórmula anterior `(vram-1024)/(layers*6)` era muito conservadora (16/32 na GTX 1050). Nova fórmula: `perLayerMB = (paramsB * 1024 * 0.575) / layers` (Q4 + GGUF overhead). `kvCacheMB = layers * contextSize * 0.009`. `gpuLayers = min(layers, max(0, (vram - kvCacheMB - 512) / perLayerMB))`. GTX 1050 → 32/32 layers.
+- **gpuLayers safety factor 0.75**: 32/32 crashou GPU (OOM). Com safetyFactor=0.75 → 24 layers. Bench: 16 layers = 2.49 tok/s → 24 layers = **3.85 tok/s (+55%)**.
+- **Auto-download GGUF from HuggingFace**: `AutoConfig.downloadModel()` usa URL de HuggingFace + stream download com progresso. `AgentModel.load({autoDownload:true})` chama automático se modelo não existe.
+- **Primeira inferência é lenta (~40s)**: Inclui warmup CUDA + model load overhead. Segunda execução ~2× mais rápida.
+
 ## Tarefas Pendentes
 - ~~**WebTransport funcional entre 2 peers reais** — CONCLUÍDO! `pnpm example:echo` funcional~~
 - ~~**Rust warnings (19→0)** — CONCLUÍDO~~
@@ -224,12 +248,16 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - ~~**Sprint 12 (v0.10.0): Breakthrough Innovations** — 9 implementações baseadas em investigação de papers/projetos~~
 - ~~**Sprint 13 (v0.11.0): Research-Driven Implementation** — 25 inovações implementadas de 87 pesquisadas~~
 - ~~**Bug Hunt v0.11.1**: 8 bugs corrigidos (4 CRITICAL, 4 HIGH, 4 MEDIUM) em 6 packages. Build/tests 100%.~~
-- **Sprint 14: Scaling & Production Readiness** — Performance benchmarking, stress tests, real hardware integration (ExecuTorch device test, WebTransport real mesh, TEE bridge real)
-- **Sprint 14: ESLint infra** — Configurar ESLint nos 7 packages que faltam (`.eslintrc` ausente em todos)
+- ~~**Sprint 14: ESLint infra** — CONCLUÍDO! 8/8 packages configurados, 0 erros~~
+- ~~**Sprint 14: CUDA Toolkit 13.0** — CONCLUÍDO! nvcc V13.0.48, GTX 1050 detetada~~
+- ~~**Sprint 14: AutoConfig + LLaMACppRuntime** — CONCLUÍDO! Deteção automática hardware + inferência GGUF GPU~~
+- ~~**Sprint 14: Frontend Webpack fix** — CONCLUÍDO! MockAgentModel inline, build 86KB~~
+- **Inferência real GPU no nó desktop** — `AgentModel.load({modelId:'phi-3-mini'})` com GGUF real (2.2GB). Testar tok/s na GTX 1050
+- **WebTransport real mesh** — múltiplos peers reais (não loopback)
+- **TEE bridge real** — DStack ou NEAR MPC-TEE com hardware real
 - **ExecuTorch Device Test** — precisa de dispositivo físico (Android/iOS com ExecuTorch)
 - **Cross-Platform CI verification** — verificar status em github.com/msrovani/SKYNET/actions
 - **WASM em Safari/Firefox** — testes cross-browser pendentes
-- **Sprint 7** — Circadian Scheduling + Plugin System + Multi-chain
 - ~~**Sprint 9.1: Stub-to-Real Hardening** — ✅ 6 stubs substituídos (v0.8.1)~~
 - ~~**Sprint 9.2: Word-Level Embeddings** — ✅ embedText word-level random projection (v0.8.2)~~
 

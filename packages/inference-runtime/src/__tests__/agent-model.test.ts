@@ -27,8 +27,8 @@ describe('AgentModel', () => {
 
   it('generates simulated response when no model', async () => {
     const result = await agent.generate('hello');
-    expect(result.content).toContain('test-agent');
     expect(result.content).toContain('hello');
+    expect(result.content.length).toBeGreaterThan(20);
     expect(result.latencyMs).toBeGreaterThanOrEqual(0);
   });
 

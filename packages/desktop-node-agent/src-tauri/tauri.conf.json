@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "network.skynet.node",
   "build": {
-    "frontendDist": "../src",
+    "frontendDist": "../public",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "echo 'SKYNET desktop node starting'",
     "beforeBuildCommand": "echo 'SKYNET desktop node ready'"
   },
   "app": {
