@@ -1,4 +1,4 @@
-export { AutoConfig, type AutoModelConfig, type HardwareDevice } from './auto-config.js';
+export { AutoConfig, type AutoModelConfig, type HardwareDevice, type PlatformType } from './auto-config.js';
 export { LLaMACppRuntime, type LLaMACppConfig, type LLaMAGenerateResult } from './llamacpp.js';
 export { AgentModel, type AgentModelConfig, type ToolAdapter, type AgentTurnResult } from './agent-model.js';
 export {
@@ -15,6 +15,7 @@ export {
 } from './executorch.js';
 export { MLXRuntime } from './mlx.js';
 export { OnnxRuntimeWeb } from './onnx-runtime.js';
+export { OnnxRuntimeMobile, type MobileBackend } from './onnx-mobile.js';
 export {
   ModelLoader,
   KNOWN_MODELS,

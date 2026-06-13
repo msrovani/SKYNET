@@ -3,8 +3,10 @@ import { resolve, dirname } from 'node:path';
 import { cpus, freemem, totalmem } from 'node:os';
 import { execSync } from 'node:child_process';
 
+export type PlatformType = 'desktop' | 'mobile' | 'tv' | 'unknown';
+
 export interface HardwareDevice {
-  type: 'cuda' | 'vulkan' | 'metal' | 'coreml' | 'qnn' | 'cpu';
+  type: 'cuda' | 'vulkan' | 'metal' | 'coreml' | 'qnn' | 'webgpu' | 'cpu';
   name: string;
   vramMB?: number;
   backendPriority: number;
@@ -13,13 +15,16 @@ export interface HardwareDevice {
 export interface AutoModelConfig {
   modelId: string;
   modelPath: string | null;
-  device: 'cpu' | 'cuda' | 'metal';
+  device: 'cpu' | 'cuda' | 'metal' | 'webgpu';
   gpuLayers: number;
   threads: number;
   contextSize: number;
   deviceMemoryMB: number;
   backendPriority: HardwareDevice[];
   batchSize: number;
+  platform: PlatformType;
+  isMobile: boolean;
+  isTV: boolean;
 }
 
 interface CatalogEntry {
@@ -49,9 +54,8 @@ function detectCUDADevices(): HardwareDevice[] {
     ];
     const hasNVCC = nvccPaths.some(p => existsSync(p));
     if (!hasNVCC) {
-      try {
-        execSync('nvidia-smi --query-gpu=name,memory.total --format=csv,noheader', { stdio: 'pipe', timeout: 5000 });
-      } catch { return devices; }
+      try { execSync('nvidia-smi --query-gpu=name,memory.total --format=csv,noheader', { stdio: 'pipe', timeout: 5000 }); }
+      catch { return devices; }
     }
     try {
       const output = execSync('nvidia-smi --query-gpu=name,memory.total --format=csv,noheader', { encoding: 'utf-8', stdio: 'pipe', timeout: 10000 });
@@ -69,7 +73,29 @@ function detectCUDADevices(): HardwareDevice[] {
   return devices;
 }
 
-function detectHardware(): { cpuCores: number; freeRamMB: number; totalRamMB: number; freeDiskMB: number; devices: HardwareDevice[] } {
+function detectWebGPUDevices(): HardwareDevice[] {
+  return [{ type: 'webgpu', name: 'WebGPU', backendPriority: 4 }];
+}
+
+function detectMobileTVHardware(): { platform: PlatformType; cpuCores: number; totalRamMB: number; freeRamMB: number; isMobile: boolean; isTV: boolean } {
+  const isNode = typeof process !== 'undefined' && process.versions?.node;
+  if (isNode) {
+    const cpuCores = cpus().length;
+    const totalRamMB = Math.floor(totalmem() / (1024 * 1024));
+    const freeRamMB = Math.floor(freemem() / (1024 * 1024));
+    return { platform: 'desktop', cpuCores, totalRamMB, freeRamMB, isMobile: false, isTV: false };
+  }
+  const ua = typeof navigator !== 'undefined' ? (navigator.userAgent || '') : '';
+  const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  const isTV = /TV|Web0S|Tizen|SmartTV|AFT/i.test(ua) || typeof (globalThis as any).tizen !== 'undefined';
+  const cpuCores = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) ? navigator.hardwareConcurrency : 4;
+  const deviceMemory = (typeof navigator !== 'undefined' && (navigator as any).deviceMemory) ? (navigator as any).deviceMemory * 1024 : 2048;
+  if (isTV) return { platform: 'tv', cpuCores, totalRamMB: deviceMemory, freeRamMB: Math.floor(deviceMemory * 0.5), isMobile: false, isTV: true };
+  if (isMobile) return { platform: 'mobile', cpuCores, totalRamMB: deviceMemory, freeRamMB: Math.floor(deviceMemory * 0.4), isMobile: true, isTV: false };
+  return { platform: 'desktop', cpuCores, totalRamMB: deviceMemory, freeRamMB: Math.floor(deviceMemory * 0.6), isMobile: false, isTV: false };
+}
+
+function detectDesktopHW(): { cpuCores: number; freeRamMB: number; totalRamMB: number; freeDiskMB: number; devices: HardwareDevice[] } {
   const cpuCores = cpus().length;
   const totalRamMB = Math.floor(totalmem() / (1024 * 1024));
   const freeRamMB = Math.floor(freemem() / (1024 * 1024));
@@ -92,12 +118,11 @@ function detectHardware(): { cpuCores: number; freeRamMB: number; totalRamMB: nu
 }
 
 function isAppleSilicon(): boolean {
-  try {
-    return process.arch === 'arm64' && process.platform === 'darwin';
-  } catch { return false; }
+  try { return process.arch === 'arm64' && process.platform === 'darwin'; }
+  catch { return false; }
 }
 
-function detectAppleDevices(): HardwareDevice[] {
+function detectAppleDevices(totalRamMB?: number): HardwareDevice[] {
   if (!isAppleSilicon()) return [];
   const devices: HardwareDevice[] = [];
   try {
@@ -106,7 +131,9 @@ function detectAppleDevices(): HardwareDevice[] {
     const totalGB = Math.floor(totalBytes / (1024 * 1024 * 1024));
     devices.push({ type: 'metal', name: `Apple Silicon ${totalGB}GB Unified`, backendPriority: 2 });
     devices.push({ type: 'coreml', name: 'Apple Neural Engine', backendPriority: 3 });
-  } catch { devices.push({ type: 'metal', name: 'Apple Silicon', backendPriority: 2 }); }
+  } catch {
+    devices.push({ type: 'metal', name: 'Apple Silicon', backendPriority: 2 });
+  }
   return devices;
 }
 
@@ -120,9 +147,7 @@ function findModelFile(modelId: string): string | null {
     resolve(modelsDir, modelId, entry.hfFile),
     resolve(modelsDir, modelId, `${modelId}.gguf`),
   ];
-  for (const p of altPaths) {
-    if (existsSync(p)) return p;
-  }
+  for (const p of altPaths) { if (existsSync(p)) return p; }
   return null;
 }
 
@@ -142,7 +167,6 @@ export class AutoConfig {
     const writer = createWriteStream(modelPath);
     const total = parseInt(response.headers.get('content-length') || '0', 10);
     let downloaded = 0;
-    const decoder = new TextDecoder();
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -159,23 +183,41 @@ export class AutoConfig {
   }
 
   static async autoDetectAndConfigure(): Promise<AutoModelConfig> {
-    const hw = detectHardware();
-    const appleDevices = detectAppleDevices();
+    const host = detectMobileTVHardware();
+    const isNode = typeof process !== 'undefined' && process.versions?.node;
+    let hw: { cpuCores: number; freeRamMB: number; totalRamMB: number; freeDiskMB: number; devices: HardwareDevice[] };
+    let appleDevices: HardwareDevice[] = [];
+
+    if (host.platform === 'desktop' && isNode) {
+      hw = detectDesktopHW();
+      appleDevices = detectAppleDevices();
+    } else {
+      hw = {
+        cpuCores: host.cpuCores,
+        freeRamMB: host.freeRamMB,
+        totalRamMB: host.totalRamMB,
+        freeDiskMB: host.isTV ? 4000 : host.isMobile ? 8000 : 50000,
+        devices: host.isTV ? detectWebGPUDevices() : [],
+      };
+      if (detectAppleDevices().length > 0) appleDevices = detectAppleDevices();
+    }
+
     const allDevices = [...hw.devices, ...appleDevices].sort((a, b) => a.backendPriority - b.backendPriority);
-    const bestDevice = allDevices[0];
     const cudaDevice = allDevices.find(d => d.type === 'cuda');
     const metalDevice = allDevices.find(d => d.type === 'metal');
-    const vramMB = cudaDevice?.vramMB ?? (metalDevice ? hw.totalRamMB : 0);
-    const deviceType: 'cuda' | 'metal' | 'cpu' = cudaDevice ? 'cuda' : metalDevice ? 'metal' : 'cpu';
-    const deviceMemoryMB = vramMB || hw.freeRamMB;
+    const webgpuDevice = allDevices.find(d => d.type === 'webgpu');
+    const vramMB = cudaDevice?.vramMB ?? (metalDevice ? hw.totalRamMB : (host.isTV ? 2048 : 0));
+    const deviceType: 'cuda' | 'metal' | 'webgpu' | 'cpu' = cudaDevice ? 'cuda' : metalDevice ? 'metal' : webgpuDevice ? 'webgpu' : 'cpu';
+    const deviceMemoryMB = vramMB || hw.freeRamMB || 2048;
     const catalogEntry = MODEL_CATALOG.slice().reverse().find(m => m.minVRAM <= deviceMemoryMB / 1024) || MODEL_CATALOG[0];
     const modelId = catalogEntry.modelId;
-    const modelPath = findModelFile(modelId);
+    const modelPath = host.platform === 'desktop' && isNode ? findModelFile(modelId) : null;
     const modelLayers = catalogEntry.layers;
     let gpuLayers = 0;
     const vramGB = deviceMemoryMB / 1024;
     const contextSize = vramGB < 6 ? 2048 : 4096;
     const batchSize = vramGB < 6 ? 128 : vramGB < 12 ? 256 : 512;
+
     if (deviceType === 'cuda' && cudaDevice) {
       const ramForGPU = Math.min(cudaDevice.vramMB || 4096, hw.freeRamMB + (cudaDevice.vramMB || 4096) - 512);
       const kvCacheMB = modelLayers * contextSize * 0.012;
@@ -192,7 +234,9 @@ export class AutoConfig {
     } else if (deviceType === 'metal') {
       gpuLayers = Math.max(0, Math.min(modelLayers, Math.floor((hw.freeRamMB - 4096) / ((catalogEntry.paramsB * 1024 * 0.575) / modelLayers))));
     }
+
     const threads = Math.max(1, hw.cpuCores - 1);
+
     return {
       modelId,
       modelPath,
@@ -203,6 +247,9 @@ export class AutoConfig {
       deviceMemoryMB,
       backendPriority: allDevices,
       batchSize,
+      platform: host.platform,
+      isMobile: host.isMobile,
+      isTV: host.isTV,
     };
   }
 }

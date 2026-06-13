@@ -2,8 +2,10 @@ export class OnnxRuntimeWeb {
   private ort: any = null;
   private session: any = null;
   private loaded = false;
+  private modelPath = '';
 
   async load(modelPath: string): Promise<void> {
+    this.modelPath = modelPath;
     try {
       this.ort = await Function('return import("onnxruntime-web")')() as any;
       this.session = await this.ort.InferenceSession.create(modelPath, {
@@ -11,7 +13,7 @@ export class OnnxRuntimeWeb {
       });
       this.loaded = true;
     } catch (err) {
-      throw new Error(`ONNX Runtime load failed: ${err}`);
+      throw new Error(`ONNX Runtime Web load failed: ${err}`);
     }
   }
 
@@ -27,7 +29,25 @@ export class OnnxRuntimeWeb {
     const outputName = this.session.outputNames[0];
     if (!outputName) throw new Error('Model has no outputs');
     const output = results[outputName];
-    if (!output) throw new Error('Output not found in results');
+    if (!output) throw new Error('Output not found');
     return output.data instanceof Float32Array ? output.data : Float32Array.from(output.data as any);
   }
+
+  async getSymbols(): Promise<{ input: string; output: string; inputDims: number[]; outputDims: number[] }> {
+    if (!this.session) throw new Error('Session not loaded');
+    return {
+      input: this.session.inputNames[0],
+      output: this.session.outputNames[0],
+      inputDims: this.session.inputNames.map(() => [1]),
+      outputDims: this.session.outputNames.map(() => [1]),
+    } as any;
+  }
+
+  unload(): void {
+    this.session = null;
+    this.ort = null;
+    this.loaded = false;
+  }
+
+  isLoaded(): boolean { return this.loaded; }
 }
