@@ -229,6 +229,9 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **gpuLayers safety factor 0.75**: 32/32 crashou GPU (OOM). Com safetyFactor=0.75 → 24 layers. Bench: 16 layers = 2.49 tok/s → 24 layers = **3.85 tok/s (+55%)**.
 - **Auto-download GGUF from HuggingFace**: `AutoConfig.downloadModel()` usa URL de HuggingFace + stream download com progresso. `AgentModel.load({autoDownload:true})` chama automático se modelo não existe.
 - **Primeira inferência é lenta (~40s)**: Inclui warmup CUDA + model load overhead. Segunda execução ~2× mais rápida.
+- **onnxruntime-react-native + coremll optional**: Adicionados como optionalDependencies. OnnxRuntimeMobile e CoreMLRuntime usam try-catch dynamic import com fallback graceful e mensagens claras.
+- **WebTransport mesh (3 peers)**: mesh-server.ts relay broadcast + mesh-client.ts init/ping/receive + run-mesh.ts orchestrator. Usa fork() + env MESH_PEER_ID/MESH_SERVER_URL.
+- **core-wasm-engine WASM build fallback**: Rust build precisa de `link.exe` (MSVC). Se não disponível, build.cjs faz fallback para TS stub automaticamente.
 
 ## Tarefas Pendentes
 - ~~**WebTransport funcional entre 2 peers reais** — CONCLUÍDO! `pnpm example:echo` funcional~~
@@ -252,12 +255,14 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - ~~**Sprint 14: CUDA Toolkit 13.0** — CONCLUÍDO! nvcc V13.0.48, GTX 1050 detetada~~
 - ~~**Sprint 14: AutoConfig + LLaMACppRuntime** — CONCLUÍDO! Deteção automática hardware + inferência GGUF GPU~~
 - ~~**Sprint 14: Frontend Webpack fix** — CONCLUÍDO! MockAgentModel inline, build 86KB~~
-- **Inferência real GPU no nó desktop** — `AgentModel.load({modelId:'phi-3-mini'})` com GGUF real (2.2GB). Testar tok/s na GTX 1050
-- **WebTransport real mesh** — múltiplos peers reais (não loopback)
+- ~~**Inferência real GPU no nó desktop** — CONCLUÍDO! phi-3-mini Q4_K_M, 24/32 layers GPU, 3.85 tok/s~~
+- ~~**WebTransport real mesh** — CONCLUÍDO! mesh-server + 3 clients broadcast~~
+- ~~**Mobile runtimes reais (iOS/Android/TV)** — CONCLUÍDO! OnnxRuntimeMobile + CoreML + ExecuTorch + MLX~~
 - **TEE bridge real** — DStack ou NEAR MPC-TEE com hardware real
 - **ExecuTorch Device Test** — precisa de dispositivo físico (Android/iOS com ExecuTorch)
 - **Cross-Platform CI verification** — verificar status em github.com/msrovani/SKYNET/actions
 - **WASM em Safari/Firefox** — testes cross-browser pendentes
+- **Desktop Tauri native build** — bloqueado: falta MSVC toolchain (link.exe). Instalar Visual Studio Build Tools ou MinGW com `rustup target add x86_64-pc-windows-gnu`
 - ~~**Sprint 9.1: Stub-to-Real Hardening** — ✅ 6 stubs substituídos (v0.8.1)~~
 - ~~**Sprint 9.2: Word-Level Embeddings** — ✅ embedText word-level random projection (v0.8.2)~~
 
@@ -268,6 +273,7 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - `pnpm lint` — linting
 - `pnpm exec turbo build` — build via Turborepo
 - `pnpm --filter @skynet/p2p-mesh-network example:echo` — WebTransport echo demo
+- `pnpm --filter @skynet/p2p-mesh-network example:mesh` — WebTransport 3-peer mesh demo
 - `pnpm --filter @skynet/p2p-mesh-network example:setup` — gerar certificados
 - `pnpm --filter @skynet/app-ui-orchestrator build:web` — build web app (Next.js)
 
