@@ -88,7 +88,19 @@ export class CoreMLRuntime {
     };
 
     try {
-      this.nativeCoreML = require('coremll');
+      try {
+        const mod = await Function('return import("coremll")')() as any;
+        this.nativeCoreML = mod.default ?? mod;
+      } catch (importErr) {
+        const msg = importErr instanceof Error ? importErr.message : String(importErr);
+        if (msg.includes('Cannot find module') || msg.includes('cannot find module') || msg.includes('Failed to resolve')) {
+          throw new Error(
+            'CoreML native module not available. Install coremll for CoreML acceleration:\n'
+            + '  npm install coremll'
+          );
+        }
+        throw importErr;
+      }
       if (this.nativeCoreML.loadModel) {
         await this.nativeCoreML.loadModel(path, {
           delegate: delegate === 'ane_and_gpu' ? 'ane_and_gpu' : delegate,
@@ -96,14 +108,13 @@ export class CoreMLRuntime {
         });
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes('coremll') && msg.includes('find')) {
-        throw new Error(
-          'CoreML native module not available. For real CoreML acceleration on iOS:\n'
-          + '  npm install coremll\n'
-          + 'Or in React Native: install react-native-coreml-mlmodel'
-        );
+      if (e instanceof Error && e.message.startsWith('CoreML native module not available')) {
+        throw e;
       }
+      if (e instanceof Error) {
+        throw new Error(`CoreML load failed: ${e.message}`);
+      }
+      throw new Error(`CoreML load failed: ${String(e)}`);
     }
 
     this.loaded = true;

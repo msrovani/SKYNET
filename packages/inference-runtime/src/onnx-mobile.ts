@@ -14,14 +14,26 @@ export class OnnxRuntimeMobile {
     this.modelPath = modelPath;
     this.backend = preferredBackend ?? await this.detectBestBackend();
     try {
-      const ort = await Function('return import("onnxruntime-react-native")')() as any;
-      const providers: string[] = [];
-      if (this.backend === 'coreml') providers.push('coreml');
-      if (this.backend === 'xnnpack' || this.backend === 'npu') providers.push('xnnpack');
-      providers.push('cpu');
-      this.session = await ort.InferenceSession.create(modelPath, { executionProviders: providers });
-      this.ort = ort;
-      this.loaded = true;
+      try {
+        const ort = await Function('return import("onnxruntime-react-native")')() as any;
+        const providers: string[] = [];
+        if (this.backend === 'coreml') providers.push('coreml');
+        if (this.backend === 'xnnpack' || this.backend === 'npu') providers.push('xnnpack');
+        providers.push('cpu');
+        this.session = await ort.InferenceSession.create(modelPath, { executionProviders: providers });
+        this.ort = ort;
+        this.loaded = true;
+        return;
+      } catch (mobileErr) {
+        const msg = mobileErr instanceof Error ? mobileErr.message : String(mobileErr);
+        if (msg.includes('Cannot find module') || msg.includes('cannot find module') || msg.includes('Failed to resolve')) {
+          throw new Error(
+            'onnxruntime-react-native not available. Install it for mobile inference:\n'
+            + '  npm install onnxruntime-react-native'
+          );
+        }
+        throw mobileErr;
+      }
     } catch (err) {
       try {
         const ort = await Function('return import("onnxruntime-web")')() as any;

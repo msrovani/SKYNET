@@ -22,6 +22,10 @@
     "@skynet/core-wasm-engine": "workspace:*",
     "node-llama-cpp": "^3.18.1"
   },
+  "optionalDependencies": {
+    "onnxruntime-react-native": "^1.20.0",
+    "coremll": "^0.2.0"
+  },
   "devDependencies": {
     "eslint": "^8.57.0",
     "typescript": "^5.4.0",
