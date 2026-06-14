@@ -16,7 +16,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run --passWithNoTests",
-    "lint": "eslint src/"
+    "lint": "eslint src/ --ext .ts"
   },
   "dependencies": {
     "@skynet/core-wasm-engine": "workspace:*",

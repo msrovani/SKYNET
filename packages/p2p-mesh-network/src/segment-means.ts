@@ -68,7 +68,8 @@ export class SegmentMeans {
 
   getCompressionRatio(data: Float32Array): number {
     const originalBytes = data.length * 4;
-    const compressedBytes = this.compress(data).means.length * 4;
+    const compressed = this.compress(data);
+    const compressedBytes = compressed.means.length * 4 + compressed.lengths.length * 4;
     return originalBytes / Math.max(compressedBytes, 1);
   }
 

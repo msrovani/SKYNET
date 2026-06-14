@@ -128,7 +128,7 @@ export class CoreMLRuntime {
     if (this.nativeCoreML && this.nativeCoreML.runInference) {
       const preprocessMs = 1;
       const result = await this.nativeCoreML.runInference(input, shape);
-      const inferenceMs = performance.now() - t0 - 1;
+      const inferenceMs = Math.max(0, performance.now() - t0 - 1);
       return {
         output: result.output instanceof Float32Array ? result.output : new Float32Array(result.output),
         shape: result.shape || shape,

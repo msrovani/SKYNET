@@ -39,7 +39,7 @@ describe('TransportManager', () => {
     const { TransportManager } = await import('../transport.js');
     const tm = new TransportManager({ relayUrl: 'https://relay.example.com' });
     await tm.connect();
-    expect(tm.getState()).toBe('degraded');
+    expect(tm.getState()).toBe('connected');
   });
 
   it('throws on send when disconnected', async () => {
@@ -126,7 +126,7 @@ describe('CrdtSync', () => {
     expect(compressed.length).toBeGreaterThan(0);
     const decoded = JSON.parse(new TextDecoder().decode(compressed));
     expect(decoded.l).toBe('peer-a');
-    expect(decoded.p.length).toBe(1);
+    expect(decoded.p.length).toBe(2);
 
     const sync2 = new CrdtSync();
     sync2.decompressSnapshot(compressed);

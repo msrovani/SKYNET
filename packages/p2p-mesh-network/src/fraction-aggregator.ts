@@ -111,6 +111,7 @@ export class FractionAggregator {
     requestId: string,
     expectedSubTaskIds: string[],
   ): AggregatedResult | null {
+    this.refinementRounds = 0;
     const allFractions: AgentFraction[] = [];
     const missing: string[] = [];
 

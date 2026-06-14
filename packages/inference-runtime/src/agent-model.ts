@@ -2,7 +2,7 @@ import { AutoConfig, type AutoModelConfig } from './auto-config.js';
 import { LLaMACppRuntime, type LLaMACppConfig } from './llamacpp.js';
 import { ExecuTorchRuntime, type InferenceResult } from './executorch.js';
 import { OnnxRuntimeWeb } from './onnx-runtime.js';
-import { OnnxRuntimeMobile, type MobileBackend } from './onnx-mobile.js';
+import { OnnxRuntimeMobile } from './onnx-mobile.js';
 import { CoreMLRuntime } from './coreml.js';
 import { MLXRuntime } from './mlx.js';
 import { simpleTokenize } from './tokenizer.js';
@@ -82,6 +82,11 @@ export class AgentModel {
     this.platform = detectPlatform();
     this.autoConfig = await AutoConfig.autoDetectAndConfigure();
 
+    if (this.config.modelId && this.config.modelId !== 'none' && this.autoConfig.modelId !== this.config.modelId) {
+      this.autoConfig.modelId = this.config.modelId;
+      this.autoConfig.modelPath = null;
+    }
+
     if (!this.autoConfig.modelPath && this.config.autoDownload && this.platform === 'node') {
       const downloadedPath = await AutoConfig.downloadModel(this.config.modelId);
       if (downloadedPath) this.autoConfig.modelPath = downloadedPath;
@@ -110,7 +115,7 @@ export class AgentModel {
         await this.llamacpp.load();
         this.activeBackend = 'llamacpp';
         return;
-      } catch {}
+      } catch { /* intentional */ }
     }
 
     try {
@@ -125,7 +130,7 @@ export class AgentModel {
       await this.executorch.load();
       this.activeBackend = 'executorch';
       return;
-    } catch {}
+    } catch { /* intentional */ }
 
     try {
       const mlx = new MLXRuntime();
@@ -133,7 +138,7 @@ export class AgentModel {
       this.mlx = mlx;
       this.activeBackend = 'mlx';
       return;
-    } catch {}
+    } catch { /* intentional */ }
 
     this.activeBackend = 'mock';
   }
@@ -144,7 +149,7 @@ export class AgentModel {
       await this.onnxMobile.load(`models/${this.config.modelId}.ort`);
       this.activeBackend = 'onnx-mobile';
       return;
-    } catch {}
+    } catch { /* intentional */ }
 
     try {
       this.coreml = new CoreMLRuntime({
@@ -154,7 +159,7 @@ export class AgentModel {
       await this.coreml.load();
       this.activeBackend = 'coreml';
       return;
-    } catch {}
+    } catch { /* intentional */ }
 
     this.activeBackend = 'mock';
   }
@@ -165,7 +170,7 @@ export class AgentModel {
       await this.onnxWeb.load(`models/${this.config.modelId}.onnx`);
       this.activeBackend = 'onnx-web';
       return;
-    } catch {}
+    } catch { /* intentional */ }
 
     this.activeBackend = 'mock';
   }
@@ -186,7 +191,7 @@ export class AgentModel {
     } else if (this.activeBackend === 'onnx-web' && this.onnxWeb) {
       try {
         const tokens = simpleTokenize(fullPrompt);
-        const input = new Float32Array(tokens.map(t => t / 32000));
+        const input = new Float32Array(tokens.map(t => Math.min(t / 32000, 1)));
         const output = await this.onnxWeb.infer(input, [1, tokens.length]);
         content = decodeTokens(Array.from(output.slice(0, 256)).map(v => Math.floor(v * 32000)));
       } catch { content = randomPortugueseResponse(prompt); }
@@ -199,7 +204,7 @@ export class AgentModel {
     } else if (this.activeBackend === 'coreml' && this.coreml) {
       try {
         const tokens = simpleTokenize(fullPrompt);
-        const input = new Float32Array(tokens.map(t => t / 32000));
+        const input = new Float32Array(tokens.map(t => Math.min(t / 32000, 1)));
         const result = await this.coreml.infer(input, [1, tokens.length]);
         content = decodeTokens(Array.from(result.output.slice(0, 256)).map(v => Math.floor(v * 32000)));
       } catch { content = randomPortugueseResponse(prompt); }

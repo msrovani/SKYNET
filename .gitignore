@@ -17,3 +17,7 @@ next-env.d.ts
 
 # GGUF model files
 packages/inference-runtime/models/
+packages/app-ui-orchestrator/apps/web/models/
+
+# Tauri desktop build output
+packages/desktop-node-agent/public/

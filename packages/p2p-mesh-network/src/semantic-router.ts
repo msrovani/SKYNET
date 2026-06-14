@@ -183,7 +183,7 @@ export class SemanticRouter {
     const dim = this.embeddingDimension;
     const centroid = new Float32Array(dim);
     for (const [qId, qVec] of this.queryVectors) {
-      if (qId.startsWith(agentId)) {
+      if (qId.startsWith(agentId + '/')) {
         for (let i = 0; i < dim; i++) centroid[i] += qVec[i];
         count++;
       }
@@ -209,10 +209,10 @@ export class SemanticRouter {
   computeAdaptiveWeights(agent: AgentRegistration): { semantic: number; tool: number; cost: number; latency: number } {
     const successes = this.successHistory.get(agent.agentId) || 0;
     const reliability = Math.min(1, successes / 10);
-    const semantic = 0.5 - reliability * 0.15;
-    const tool = 0.3 - reliability * 0.1;
-    const cost = 0.1 + reliability * 0.15;
-    const latency = 0.1 + reliability * 0.1;
+    const semantic = 0.5 + reliability * 0.15;
+    const tool = 0.3 + reliability * 0.1;
+    const cost = 0.1 - reliability * 0.15;
+    const latency = 0.1 - reliability * 0.1;
     const total = semantic + tool + cost + latency;
     return {
       semantic: semantic / total,

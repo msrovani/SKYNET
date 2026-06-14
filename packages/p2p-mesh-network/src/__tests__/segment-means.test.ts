@@ -19,7 +19,7 @@ describe('SegmentMeans', () => {
     const sm = new SegmentMeans({ segmentSize: 16 });
     const data = new Float32Array(256);
     const ratio = sm.getCompressionRatio(data);
-    expect(ratio).toBe(16);
+    expect(ratio).toBe(8);
   });
 
   it('handles data not divisible by segment size', async () => {
@@ -47,9 +47,9 @@ describe('SegmentMeans', () => {
   it('updates config dynamically', async () => {
     const { SegmentMeans } = await import('../segment-means.js');
     const sm = new SegmentMeans({ segmentSize: 8 });
-    expect(sm.getCompressionRatio(new Float32Array(64))).toBe(8);
-    sm.updateConfig({ segmentSize: 4 });
     expect(sm.getCompressionRatio(new Float32Array(64))).toBe(4);
+    sm.updateConfig({ segmentSize: 4 });
+    expect(sm.getCompressionRatio(new Float32Array(64))).toBe(2);
   });
 
   it('preserves tensor shape metadata', async () => {

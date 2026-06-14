@@ -51,8 +51,10 @@ export class KeylimeContinuousAttestation {
     let continuousScore = 1;
     if (this.measurements.length >= 2) {
       const recent = this.measurements.slice(-5);
+      if (recent.length === 0) { continuousScore = 1; } else {
       const stable = recent.filter(m => m.pcrValue === recent[recent.length - 1].pcrValue);
       continuousScore = stable.length / recent.length;
+      }
     }
     if (continuousScore < 0.6) {
       this.violations.push(`Low continuous score: ${continuousScore}`);

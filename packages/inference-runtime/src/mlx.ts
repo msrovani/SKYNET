@@ -45,10 +45,18 @@ try:
 except Exception as e:
     print(json.dumps({"error": str(e)}))
 `;
-      const proc = spawn('python3', ['-c', script], { timeout: 60000, stdio: ['pipe', 'pipe', 'pipe'] });
+      const proc = spawn('python3', ['-c', script], { stdio: ['pipe', 'pipe', 'pipe'] });
       let output = '';
+      let timedOut = false;
+      const timer = setTimeout(() => {
+        timedOut = true;
+        proc.kill();
+        reject(new Error('MLX process timed out after 60s'));
+      }, 60000);
       proc.stdout.on('data', (d: Buffer) => { output += d.toString(); });
       proc.on('close', (code: number | null) => {
+        clearTimeout(timer);
+        if (timedOut) return;
         if (code !== 0) return reject(new Error(`MLX process exited code ${code}`));
         try {
           const parsed = JSON.parse(output);
@@ -58,7 +66,11 @@ except Exception as e:
           resolve(output.trim());
         }
       });
-      proc.on('error', reject);
+      proc.on('error', (err) => {
+        clearTimeout(timer);
+        if (timedOut) return;
+        reject(err);
+      });
     });
   }
 

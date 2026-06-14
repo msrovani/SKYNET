@@ -130,12 +130,12 @@ export class AcousticCrdtSync {
 
         onPacket?.(packet);
         packetsSent++;
-        delivered = true;
-        packetsReceived++;
-        bytesTransferred += chunk.length;
-        signalQualitySum += signalQuality;
-
-        if (!delivered) {
+        delivered = signalQuality > 0.3;
+        if (delivered) {
+          packetsReceived++;
+          bytesTransferred += chunk.length;
+          signalQualitySum += signalQuality;
+        } else {
           await new Promise(r => setTimeout(r, 50));
           retries++;
         }

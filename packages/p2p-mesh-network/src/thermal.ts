@@ -431,10 +431,10 @@ export class FUSEGovernor {
   }
 
   lookup(zone: ThermalZone): FUSEConfig {
-    const key = `${this.deviceClass}_${zone}_${this.batchSize}`;
+    const key = `${this.deviceClass}_${zone}`;
     const cached = this.configCache.get(key);
     if (cached) return cached;
-    const profile = FUSE_PROFILES.get(key) || FUSE_PROFILES.get('mobile_safe')!;
+    const profile = FUSE_PROFILES.get(`${this.deviceClass}_${zone}`) || FUSE_PROFILES.get('mobile_safe')!;
     const config: FUSEConfig = { ...profile };
     if (this.batchSize > 256) {
       config.gpuFreq = Math.round(config.gpuFreq * 0.85);

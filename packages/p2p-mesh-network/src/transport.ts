@@ -92,6 +92,7 @@ export class TransportManager {
 
   private async readLoop(reader: any, writer?: any): Promise<void> {
     try {
+      // eslint-disable-next-line no-constant-condition
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -104,15 +105,21 @@ export class TransportManager {
 
   private async tryWebRTC(): Promise<void> {
     this.state = 'degraded';
-    const { WebRTCFallback } = await import('./webrtc-fallback.js');
-    const rtc = new WebRTCFallback();
-    await rtc.connect();
-    this.connection = rtc;
-    rtc.onMessage((data: Uint8Array) => {
-      for (const handler of this.messageHandlers) {
-        handler(data, 'relay');
-      }
-    });
+    try {
+      const { WebRTCFallback } = await import('./webrtc-fallback.js');
+      const rtc = new WebRTCFallback();
+      await rtc.connect();
+      this.connection = rtc;
+      this.state = 'connected';
+      rtc.onMessage((data: Uint8Array) => {
+        for (const handler of this.messageHandlers) {
+          handler(data, 'relay');
+        }
+      });
+    } catch {
+      this.state = 'disconnected';
+      throw new Error('WebRTC fallback failed');
+    }
   }
 
   private sendWriter: any = null;

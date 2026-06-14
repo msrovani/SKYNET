@@ -80,9 +80,9 @@ export class PipelineManager {
     if (totalLayers < minLayers) throw new Error('Not enough layers for peers');
     const remaining = totalLayers - minLayers;
 
-    let rawFractions = peers.map((_, i) => (weights[i] / totalWeight) * remaining);
+    const rawFractions = peers.map((_, i) => (weights[i] / totalWeight) * remaining);
     let layerCounts = rawFractions.map((f) => Math.floor(f));
-    let remainderSum = remaining - layerCounts.reduce((s, c) => s + c, 0);
+    const remainderSum = remaining - layerCounts.reduce((s, c) => s + c, 0);
 
     // Distribute remainder to peers with largest fractional part
     const fracParts = rawFractions.map((f, i) => ({ idx: i, frac: f - Math.floor(f) }));
@@ -140,7 +140,7 @@ export class PipelineManager {
     try {
       await this.transport.send(data, targetPeerId);
     } catch (err: any) {
-      this.emit({ type: 'forward-error', peerId: targetPeerId, data: err.message });
+      this.emit({ type: 'forward-error', peerId: targetPeerId, data: (err as any)?.message ?? String(err) });
       throw err;
     }
   }
@@ -192,6 +192,7 @@ export type ParallelismType = 'tp' | 'ep' | 'cp' | 'dp' | 'pp';
 export interface ParallelFoldingConfig {
   attentionParallelism: ParallelismType;
   moeParallelism: ParallelismType;
+  layerTypes?: Array<'attention' | 'moe'>;
 }
 
 export class MoEParallelFolding {
@@ -208,8 +209,9 @@ export class MoEParallelFolding {
 
   createPlan(numLayers: number, numExperts: number, peers: PeerCapability[]): Map<number, ParallelismType> {
     const plan = new Map<number, ParallelismType>();
+    const layerTypes = this.config.layerTypes;
     for (let i = 0; i < numLayers; i++) {
-      if (i < numExperts) {
+      if (layerTypes ? layerTypes[i] === 'moe' : i < numExperts) {
         plan.set(i, this.config.moeParallelism);
       } else {
         plan.set(i, this.config.attentionParallelism);
@@ -271,8 +273,14 @@ export class TAHQuantTransform {
     return { quantized, scales };
   }
 
-  getCompressionRatio(): number {
-    const bitsPerFloat = 32;
-    return bitsPerFloat / (this.targetBits + 2);
+  /** NOTE: compress() stores dequantized float32 values (not packed ints), so no real compression occurs.
+   *  The overhead of per-block scales means the output is always slightly larger than the input.
+   *  Returns the actual ratio for a given data length. */
+  getCompressionRatio(dataLength?: number): number {
+    const n = dataLength ?? 1024;
+    const numBlocks = Math.ceil(n / this.blockSize);
+    const compressedBytes = n * 4 + numBlocks * 4;
+    const originalBytes = n * 4;
+    return originalBytes / compressedBytes;
   }
 }

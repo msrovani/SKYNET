@@ -103,6 +103,7 @@ export class ZkFlProver {
     globalStep: number,
     batchUpdates: number[][],
   ): Promise<ZkProveResult> {
+    if (batchUpdates.length === 0 || batchUpdates[0]?.length === 0) throw new Error('Empty batch cannot generate proof');
     const aggregated = new Array(batchUpdates[0]?.length ?? 0).fill(0);
     for (const update of batchUpdates) {
       for (let i = 0; i < update.length; i++) {

@@ -49,6 +49,7 @@ export class NearMPCTEE {
 
   async thresholdSign(message: string): Promise<MPCSignatureResult> {
     const verified = this.getVerifiedNodes();
+    if (verified.length === 0) throw new Error('No verified nodes available');
     const threshold = Math.ceil(verified.length * this.THRESHOLD_RATIO);
     const selected = verified.slice(0, Math.min(threshold, verified.length));
     return {

@@ -9,7 +9,7 @@
     "build:mobile": "cd apps/mobile && npx expo build",
     "build:web": "cd apps/web && next build",
     "test": "vitest run --passWithNoTests",
-    "lint": "eslint apps/ shared/"
+    "lint": "eslint apps/ shared/ --ext .ts,.tsx"
   },
   "dependencies": {
     "@skynet/blockchain-client": "workspace:*",

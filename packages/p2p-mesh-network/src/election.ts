@@ -59,7 +59,7 @@ export class RoleElection {
         score: computeScore(this.localCap),
         role: this.localRole,
       }));
-      this.transport.send(capData, peerId);
+      this.transport.send(capData, peerId).catch(() => {});
     }
   }
 
@@ -117,7 +117,7 @@ export class RoleElection {
         this.transport.send(
           new TextEncoder().encode(JSON.stringify({ type: 'l3_heartbeat', id: '__local__' })),
           peerId,
-        );
+        ).catch(() => {});
       }
     }, this.HEARTBEAT_L3_MS);
   }

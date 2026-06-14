@@ -20,8 +20,7 @@ export class LVSAVerifier {
 
   submitMask(clientId: string, mask: MaskedGradient): void {
     this.receivedMasks.set(clientId, mask);
-    if (this.verifyMask(mask)) {
-    }
+    if (!this.verifyMask(mask)) throw new Error('Invalid mask');
   }
 
   private verifyMask(mask: MaskedGradient): boolean {
@@ -35,7 +34,7 @@ export class LVSAVerifier {
 
   aggregate(): { aggregated: number[]; proof: AggregationProof } | null {
     const clients = Array.from(this.receivedMasks.values());
-    if (clients.length < Math.ceil(this.expectedClientCount * 0.5)) return null;
+    if (clients.length === 0 || clients.length < Math.ceil(this.expectedClientCount * 0.5)) return null;
     const dim = clients[0].maskedUpdate.length;
     const aggregated = new Array(dim).fill(0);
     for (const c of clients) {

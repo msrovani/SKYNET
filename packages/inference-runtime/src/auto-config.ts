@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, createWriteStream } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve } from 'node:path';
 import { cpus, freemem, totalmem } from 'node:os';
 import { execSync } from 'node:child_process';
 
@@ -45,18 +45,6 @@ const MODEL_CATALOG: CatalogEntry[] = [
 function detectCUDADevices(): HardwareDevice[] {
   const devices: HardwareDevice[] = [];
   try {
-    const cudaPath = process.env.CUDA_PATH || process.env.CUDA_PATH_V13_0 || '';
-    const nvccPaths = [
-      ...(cudaPath ? [`${cudaPath}\\bin\\nvcc.exe`] : []),
-      'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.0\\bin\\nvcc.exe',
-      'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.8\\bin\\nvcc.exe',
-      'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.6\\bin\\nvcc.exe',
-    ];
-    const hasNVCC = nvccPaths.some(p => existsSync(p));
-    if (!hasNVCC) {
-      try { execSync('nvidia-smi --query-gpu=name,memory.total --format=csv,noheader', { stdio: 'pipe', timeout: 5000 }); }
-      catch { return devices; }
-    }
     try {
       const output = execSync('nvidia-smi --query-gpu=name,memory.total --format=csv,noheader', { encoding: 'utf-8', stdio: 'pipe', timeout: 10000 });
       for (const line of output.trim().split('\n')) {
@@ -69,7 +57,7 @@ function detectCUDADevices(): HardwareDevice[] {
         }
       }
     } catch { return devices; }
-  } catch { }
+  } catch { /* intentional */ }
   return devices;
 }
 
@@ -122,7 +110,7 @@ function isAppleSilicon(): boolean {
   catch { return false; }
 }
 
-function detectAppleDevices(totalRamMB?: number): HardwareDevice[] {
+function detectAppleDevices(_totalRamMB?: number): HardwareDevice[] {
   if (!isAppleSilicon()) return [];
   const devices: HardwareDevice[] = [];
   try {
@@ -167,6 +155,7 @@ export class AutoConfig {
     const writer = createWriteStream(modelPath);
     const total = parseInt(response.headers.get('content-length') || '0', 10);
     let downloaded = 0;
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -199,7 +188,8 @@ export class AutoConfig {
         freeDiskMB: host.isTV ? 4000 : host.isMobile ? 8000 : 50000,
         devices: host.isTV ? detectWebGPUDevices() : [],
       };
-      if (detectAppleDevices().length > 0) appleDevices = detectAppleDevices();
+      const detected = detectAppleDevices();
+      if (detected.length > 0) appleDevices = detected;
     }
 
     const allDevices = [...hw.devices, ...appleDevices].sort((a, b) => a.backendPriority - b.backendPriority);
@@ -219,8 +209,8 @@ export class AutoConfig {
     const batchSize = vramGB < 6 ? 128 : vramGB < 12 ? 256 : 512;
 
     if (deviceType === 'cuda' && cudaDevice) {
-      const ramForGPU = Math.min(cudaDevice.vramMB || 4096, hw.freeRamMB + (cudaDevice.vramMB || 4096) - 512);
-      const kvCacheMB = modelLayers * contextSize * 0.012;
+      const ramForGPU = cudaDevice.vramMB || 4096;
+      const kvCacheMB = modelLayers * contextSize * 0.009;
       const scratchMB = 256;
       const overheadMB = 256;
       const cudaRuntimeMB = 512;
@@ -232,7 +222,11 @@ export class AutoConfig {
       const perLayerMB = modelWeightMB / modelLayers;
       gpuLayers = Math.min(modelLayers, Math.max(0, Math.floor(availableForLayers * safetyFactor / perLayerMB)));
     } else if (deviceType === 'metal') {
-      gpuLayers = Math.max(0, Math.min(modelLayers, Math.floor((hw.freeRamMB - 4096) / ((catalogEntry.paramsB * 1024 * 0.575) / modelLayers))));
+      if (modelLayers === 0) {
+        gpuLayers = 0;
+      } else {
+        gpuLayers = Math.max(0, Math.min(modelLayers, Math.floor((hw.freeRamMB - 4096) / ((catalogEntry.paramsB * 1024 * 0.575) / modelLayers))));
+      }
     }
 
     const threads = Math.max(1, hw.cpuCores - 1);

@@ -19,6 +19,9 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "scripts": {
+    "lint": "eslint stub/ --ext .ts"
+  },
   "devDependencies": {
     "wasm-pack": "^0.13.0",
     "typescript": "^5.4.0",

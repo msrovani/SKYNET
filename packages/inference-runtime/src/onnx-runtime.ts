@@ -33,14 +33,14 @@ export class OnnxRuntimeWeb {
     return output.data instanceof Float32Array ? output.data : Float32Array.from(output.data as any);
   }
 
-  async getSymbols(): Promise<{ input: string; output: string; inputDims: number[]; outputDims: number[] }> {
+  getSymbols(): { input: string; output: string; inputDims: number[][]; outputDims: number[][] } {
     if (!this.session) throw new Error('Session not loaded');
     return {
       input: this.session.inputNames[0],
       output: this.session.outputNames[0],
       inputDims: this.session.inputNames.map(() => [1]),
       outputDims: this.session.outputNames.map(() => [1]),
-    } as any;
+    };
   }
 
   unload(): void {

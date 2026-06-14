@@ -97,7 +97,8 @@ export class ZkFlVerifier {
   }
 
   verifyGradientIntegrity(update: number[], proof: ZkProof): boolean {
-    const expectedParams = proof.publicInputs.length > 0 ? update.length : 0;
-    return expectedParams > 0 && update.length >= 128;
+    const computedHash = hashGradientUpdate(update);
+    if (computedHash !== proof.updateHash) return false;
+    return proof.publicInputs.length > 0 && update.length >= 128;
   }
 }

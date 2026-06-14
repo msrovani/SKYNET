@@ -107,7 +107,7 @@ export class ProofOfTime {
 
     result.signature = await this.sign(result);
 
-    if (this.config.requireAttestation && !attestationReport) {
+    if (this.config.requireAttestation && !attestationReport?.verified) {
       result.verified = false;
       return result;
     }

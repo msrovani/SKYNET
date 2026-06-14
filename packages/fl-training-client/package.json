@@ -16,7 +16,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
-    "lint": "eslint src/"
+    "lint": "eslint src/ test/ --ext .ts"
   },
   "dependencies": {
     "@skynet/inference-runtime": "workspace:*",

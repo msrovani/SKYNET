@@ -1,5 +1,4 @@
 import { getLlama, LlamaCompletion, type Llama, type LlamaModel, type LlamaContext, type LlamaContextSequence } from 'node-llama-cpp';
-import type { AutoModelConfig } from './auto-config.js';
 
 export interface LLaMACppConfig {
   modelPath: string;

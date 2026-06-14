@@ -119,7 +119,7 @@ export class SpeculativeDecoder {
     const speculationLen = this.getSpeculationLen(stage);
     const tokens: number[] = [];
     const probabilities: Float32Array[] = [];
-    let context = [...prefixTokens];
+    const context = [...prefixTokens];
     for (let i = 0; i < speculationLen; i++) {
       const logits = draftLogits(context);
       const probs = this.softmax(logits);
@@ -348,7 +348,7 @@ export class SpeculativeDecoder {
 
     const elapsed = Date.now() - verifierStart;
     if (elapsed > 10 && additionalDraftLen > 0 && rejectionPos >= draft.speculationLen) {
-      additionalContext = acceptedTokens.slice(-additionalDraftLen);
+      additionalContext = this.generateDraftTokens(context, additionalDraftLen, targetLogits);
     }
 
     this.stats.totalDraftTokens += draft.speculationLen;
@@ -373,6 +373,23 @@ export class SpeculativeDecoder {
         }
       : null;
     return { verification, additionalDraft };
+  }
+
+  private generateDraftTokens(
+    context: number[],
+    count: number,
+    targetLogits: (tokens: number[]) => Float32Array,
+  ): number[] {
+    const tokens: number[] = [];
+    const ctx = [...context];
+    for (let i = 0; i < count; i++) {
+      const logits = targetLogits(ctx);
+      const probs = this.softmax(logits);
+      const sampled = this.sample(probs);
+      tokens.push(sampled);
+      ctx.push(sampled);
+    }
+    return tokens;
   }
 
   // Truncated Sparse Logits Transmission (TSLT) — transmit only top-k logits
@@ -416,10 +433,8 @@ export class SpeculativeDecoder {
       if (predictedAccept > 0.5) {
         acceptedTokens.push(draft.tokens[i]);
         context.push(draft.tokens[i]);
-        if (targetProbs.length === 0) {
           const logits = targetLogits(context);
           targetProbs.push(this.softmax(logits));
-        }
       } else {
         const logits = targetLogits(context);
         const probs = this.softmax(logits);

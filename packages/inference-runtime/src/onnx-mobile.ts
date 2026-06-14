@@ -1,5 +1,4 @@
 import { InferenceResult } from './executorch.js';
-import { simpleTokenize } from './tokenizer.js';
 
 export type MobileBackend = 'coreml' | 'xnnpack' | 'npu' | 'cpu';
 

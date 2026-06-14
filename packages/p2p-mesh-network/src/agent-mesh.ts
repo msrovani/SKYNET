@@ -123,6 +123,22 @@ export class AgentMeshManager {
         currentLoad: heartbeat.currentLoad,
         tasksCompleted: heartbeat.tasksCompleted,
       });
+      if (!this.agents.has(heartbeat.agentId)) {
+        const registration: AgentRegistration = {
+          agentId: heartbeat.agentId,
+          nodeId: heartbeat.nodeId,
+          modelId: 'remote',
+          tools: [],
+          systemPrompt: '',
+          capabilityEmbedding: embedText(`agent ${heartbeat.agentId}`, 64),
+          costPerTask: 0.001,
+          maxConcurrent: 1,
+          avgLatencyMs: heartbeat.avgLatencyMs ?? 100,
+          domain: 'remote',
+        };
+        this.agents.set(heartbeat.agentId, registration);
+        this.router.registerAgent(registration);
+      }
       this.emit('agent_online', { agentId: heartbeat.agentId, nodeId: heartbeat.nodeId });
     }
   }
@@ -158,6 +174,7 @@ export class AgentMeshManager {
           health.missedHeartbeats++;
           if (health.missedHeartbeats >= this.MAX_MISSED_HEARTBEATS) {
             health.status = 'offline';
+            this.router.unregisterAgent(agentId);
             this.emit('agent_offline', { agentId, nodeId: health.nodeId, reason: 'missed_heartbeats' });
           } else {
             health.status = 'degraded';

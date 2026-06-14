@@ -74,12 +74,13 @@ export class MicroTxManager {
     try {
       const ok = await this.solana.channelPayment(channelId, amountLamports);
       if (!ok) throw new Error('Channel payment failed');
+      const solPrice = await this.solana.getSolPrice();
 
       const result: TxResult = {
         success: true,
         channelId,
         feeUsd: 0,
-        amountUsd: amountLamports / 1e9 * 150,
+        amountUsd: amountLamports / 1e9 * solPrice,
         timestamp: Date.now(),
         status: 'confirmed',
       };
@@ -130,6 +131,8 @@ export class MicroTxManager {
       batch.confirmedAt = Date.now();
     } catch (err) {
       batch.status = 'failed';
+      this.batches.push(batch);
+      return batch;
     }
 
     this.batches.push(batch);

@@ -635,7 +635,8 @@ export function blake3Checksum(data: Uint8Array): string {
   if (wasmModule?.blake3_hex) {
     return wasmModule.blake3_hex(data);
   }
-  let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
+  let h0 = 0x6a09e667;
+  const h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
   for (let i = 0; i < data.length; i++) {
     h0 ^= data[i];
     h0 = (h0 << 5) | (h0 >>> 27);

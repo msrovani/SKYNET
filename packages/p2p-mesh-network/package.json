@@ -16,7 +16,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
-    "lint": "eslint src/",
+    "lint": "eslint src/ --ext .ts",
     "example:setup": "tsx scripts/generate-cert.ts",
     "example:server": "tsx scripts/echo-server.ts",
     "example:client": "tsx scripts/echo-client.ts",

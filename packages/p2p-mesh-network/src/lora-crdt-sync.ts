@@ -121,11 +121,12 @@ export class LoRaCrdtSync {
           delivered = true;
           packetsAcked++;
         } else {
-          delivered = true;
+          delivered = Math.random() < 0.8;
         }
 
-        bytesTransferred += chunk.length;
-        if (!delivered) {
+        if (delivered) {
+          bytesTransferred += chunk.length;
+        } else {
           await new Promise(r => setTimeout(r, this.config.retryDelayMs));
           retries++;
         }

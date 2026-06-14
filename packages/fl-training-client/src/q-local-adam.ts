@@ -74,7 +74,7 @@ export class QLocalAdam {
 
   private quantizeMomentum(val: number): number {
     const raw = Math.round((val / 0.1) * 127);
-    return Math.min(127, Math.max(-128, raw));
+    return Math.min(127, Math.max(-127, raw));
   }
 
   private quantizeVariance(val: number): number {

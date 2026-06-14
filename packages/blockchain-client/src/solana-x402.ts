@@ -271,12 +271,13 @@ export class SolanaX402 {
     return null;
   }
 
-  private async getSolPrice(): Promise<number> {
+  async getSolPrice(): Promise<number> {
     if (this.config.simulate) return 150;
     try {
       const resp = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
       const data = await resp.json() as any;
-      return data.solana?.usd ?? 150;
+      const price = data.solana?.usd;
+      return (price != null && price > 0) ? price : 150;
     } catch {
       return 150;
     }

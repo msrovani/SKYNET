@@ -1,7 +1,7 @@
 import { SolanaX402, type PaymentReceipt } from './solana-x402.js';
 import { MicroTxManager, type TxResult } from './microtx.js';
 
-const LAMPORTS_PER_SOL = 1_000_000_000;
+const LAMPORTS_PER_SOL = 1_000_000_000; // matches @solana/web3.js LAMPORTS_PER_SOL
 
 export interface AgentPaymentConfig {
   ratePerTaskLamports: number;
@@ -61,11 +61,12 @@ export class AgentX402Payments {
   }
 
   async payTask(quote: AgentPaymentQuote, _userWallet: string): Promise<TxResult> {
+    const solPrice = await this.x402.getSolPrice();
     const freq = await this.estimateFrequency(quote.agentId);
     if (freq >= this.CHANNEL_COST_THRESHOLD) {
       return this.payViaChannel(quote, _userWallet);
     }
-    return this.microtx.payForInference(quote.taskId, quote.estimatedCost / LAMPORTS_PER_SOL * 150);
+    return this.microtx.payForInference(quote.taskId, quote.estimatedCost / LAMPORTS_PER_SOL * solPrice);
   }
 
   private async estimateFrequency(_agentId: string): Promise<number> {
@@ -89,11 +90,12 @@ export class AgentX402Payments {
   }
 
   async payViaChannel(quote: AgentPaymentQuote, _userWallet: string): Promise<TxResult> {
+    const merchantWallet = this.config.merchantWallet;
     let channel = Array.from(this.channels.values())
-      .find(c => c.merchantWallet === _userWallet && c.status === 'open');
+      .find(c => c.merchantWallet === merchantWallet && c.status === 'open');
 
     if (!channel) {
-      channel = await this.openChannel(_userWallet, quote.estimatedCost * 10);
+      channel = await this.openChannel(merchantWallet, quote.estimatedCost * 10);
     }
 
     if (channel.remainingBalance < quote.estimatedCost) {

@@ -22,6 +22,7 @@ export class FEDADAVR extends FedYogi {
 
     if (updates.length === 0) return [];
 
+    // TODO: variance reduction via historical control variates is pending implementation
     return this.aggregateClientUpdates(updates);
   }
 

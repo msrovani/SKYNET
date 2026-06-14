@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ZkFlProver } from '../src/zk-fl-prover.js';
+import { ZkFlProver, hashGradientUpdate } from '../src/zk-fl-prover.js';
 import { ZkFlVerifier } from '../src/zk-fl-verifier.js';
 
 describe('ZkFlVerifier', () => {
@@ -50,11 +50,12 @@ describe('ZkFlVerifier', () => {
   it('checks gradient integrity', () => {
     const verifier = new ZkFlVerifier();
     const updates = new Array(256).fill(0.1);
+    const computedHash = hashGradientUpdate(updates);
     const proof = {
       scheme: 'groth16' as const,
       clientId: 'c1',
       globalStep: 1,
-      updateHash: 'deadbeef',
+      updateHash: computedHash,
       proofData: 'zk_sim_test',
       publicInputs: ['client_c1', 'step_1', 'hash_deadbeef'],
       timestamp: Date.now(),

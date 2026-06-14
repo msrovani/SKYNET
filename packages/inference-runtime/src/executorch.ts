@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { simpleTokenize } from './tokenizer.js';
+import { execSync } from 'node:child_process';
+
 
 export type ExecuTorchBackend = 'xnnpack' | 'vulkan' | 'qnn' | 'coreml' | 'mps';
 
@@ -52,8 +53,6 @@ function parsePTEHeader(modelPath: string): { parameterCount: number; requiredMe
     const fd = readFileSync(resolved);
     const header = fd.slice(0, Math.min(256, fd.length));
     if (header[0] === 0x50 && header[1] === 0x54 && header[2] === 0x45) {
-      const flatbufferSize = new Uint32Array(fd.slice(12, 16).buffer)[0];
-      const progSize = new Uint32Array(fd.slice(16, 20).buffer)[0];
       const totalBytes = fd.length;
       const estParams = Math.max(100_000, Math.floor(totalBytes / 512));
       return { parameterCount: estParams, requiredMemoryMb: Math.ceil(totalBytes / (1024 * 1024)) + 64 };
@@ -68,7 +67,6 @@ function parsePTEHeader(modelPath: string): { parameterCount: number; requiredMe
 function getAvailableBackendsReal(): ExecuTorchBackend[] {
   const backends: ExecuTorchBackend[] = [];
   try {
-    const { execSync } = require('node:child_process');
     if (process.platform === 'darwin') {
       try { execSync('sysctl -n machdep.cpu.brand_string', { stdio: 'pipe', timeout: 1000 });
         backends.push('mps', 'coreml');
@@ -78,15 +76,15 @@ function getAvailableBackendsReal(): ExecuTorchBackend[] {
       try {
         execSync('ldconfig -p 2>/dev/null | grep -i vulkan', { stdio: 'pipe', timeout: 1000 });
         backends.push('vulkan');
-      } catch {}
+      } catch { /* intentional */ }
     }
     if (process.platform === 'win32') {
       try {
         execSync('where vulkaninfo 2>NUL', { stdio: 'pipe', timeout: 1000 });
         backends.push('vulkan');
-      } catch {}
+      } catch { /* intentional */ }
     }
-  } catch {}
+  } catch { /* intentional */ }
   backends.push('xnnpack');
   return backends;
 }
@@ -148,7 +146,7 @@ export class ExecuTorchRuntime {
           graphOptimizationLevel: 'all',
         });
       }
-    } catch {}
+    } catch { /* intentional */ }
 
     this.loaded = true;
     return this.metadata;
@@ -168,7 +166,7 @@ export class ExecuTorchRuntime {
       this.onnxSession = await this.onnxOrt.InferenceSession.create(new Uint8Array(buffer), {
         executionProviders: ['cpu'],
       });
-    } catch {}
+    } catch { /* intentional */ }
     this.loaded = true;
     return this.metadata;
   }
@@ -202,7 +200,7 @@ export class ExecuTorchRuntime {
           },
           memoryUsedMb: estimateMemory(this.metadata?.parameterCount ?? 1_000_000_000, 'int4'),
         };
-      } catch {}
+      } catch { /* intentional */ }
     }
 
     const genToken = (seed: number): number =>

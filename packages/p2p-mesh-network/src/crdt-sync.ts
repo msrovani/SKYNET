@@ -39,6 +39,17 @@ export class CrdtSync {
 
   constructor() {
     this.doc = Automerge.init<MeshState>();
+    this.doc = Automerge.change(this.doc, (doc: any) => {
+      if (!doc.peers) doc.peers = {};
+      if (!doc.peers['__local__']) {
+        doc.peers['__local__'] = {
+          id: '__local__',
+          lastSeen: Date.now(),
+          load: 0,
+          availableMemory: 0,
+        };
+      }
+    });
   }
 
   updateCapability(cap: NodeCapability, role: NodeRole, score: number): void {
