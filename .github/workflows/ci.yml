@@ -8,19 +8,17 @@ on:
 
 env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  SKYNET_CI: true
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+      - run: corepack enable; corepack prepare pnpm@9.0.0 --activate
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm lint
 
@@ -31,13 +29,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+      - run: corepack enable; corepack prepare pnpm@9.0.0 --activate
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm build
         env:
@@ -58,13 +53,10 @@ jobs:
         with:
           target: wasm32-unknown-unknown
           cache: true
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+      - run: corepack enable; corepack prepare pnpm@9.0.0 --activate
       - name: Install JS dependencies
         run: pnpm install --no-frozen-lockfile
       - name: Download wasm-bindgen-cli
@@ -98,13 +90,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+      - run: corepack enable; corepack prepare pnpm@9.0.0 --activate
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm test
         env:
