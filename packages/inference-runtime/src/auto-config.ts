@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, createWriteStream, createReadStream } from 'node:fs';
 import { resolve } from 'node:path';
-import { cpus, freemem, totalmem } from 'node:os';
+import { cpus, freemem, totalmem, platform, arch } from 'node:os';
 import { execSync } from 'node:child_process';
 import { createGzip, createGunzip } from 'node:zlib';
 
@@ -119,7 +119,7 @@ function detectDesktopHW(): { cpuCores: number; freeRamMB: number; totalRamMB: n
 }
 
 function isAppleSilicon(): boolean {
-  return process.arch === 'arm64' && process.platform === 'darwin';
+  return arch() === 'arm64' && platform() === 'darwin';
 }
 
 function detectAppleDevices(_totalRamMB?: number): HardwareDevice[] {

@@ -98,6 +98,15 @@ importers:
         specifier: workspace:*
         version: link:../core-wasm-engine
     devDependencies:
+      '@skynet/inference-runtime':
+        specifier: workspace:*
+        version: link:../inference-runtime
+      '@skynet/p2p-mesh-network':
+        specifier: workspace:*
+        version: link:../p2p-mesh-network
+      '@skynet/tee-attestation-layer':
+        specifier: workspace:*
+        version: link:../tee-attestation-layer
       '@tauri-apps/api':
         specifier: ^2.0.0
         version: 2.11.0
