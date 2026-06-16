@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 describe('Distributed Speculative Decoding (DSD) Tests', () => {
   describe('DSD Token Generation', () => {
@@ -63,10 +63,9 @@ describe('Distributed Speculative Decoding (DSD) Tests', () => {
     it('should verify draft tokens parallel with target model', () => {
       const draftTokens = [4, 5, 6, 7, 8];
       const acceptedTokens: number[] = [];
-      const rejectionPos = draftTokens.length;
       let resampled = -1;
 
-      const targetLogits = (tokens: number[]) => {
+      const targetLogits = (_tokens: number[]) => {
         const logits = new Float32Array(100);
         for (let i = 0; i < 100; i++) logits[i] = Math.random();
         return logits;

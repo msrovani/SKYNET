@@ -182,9 +182,10 @@ export class AutoConfig {
       const total = parseInt(response.headers.get('content-length') || '0', 10);
       let downloaded = 0;
       
-      while (true) {
+      let reading = true;
+      while (reading) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) { reading = false; break; }
         chunks.push(value);
         downloaded += value.length;
         if (total > 0) {

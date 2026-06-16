@@ -1,5 +1,5 @@
 import { AutoConfig, type AutoModelConfig } from './auto-config.js';
-import { LLaMACppRuntime, type LLaMACppConfig, type LLaMAGenerateResult } from './llamacpp.js';
+import { LLaMACppRuntime, type LLaMACppConfig } from './llamacpp.js';
 import { ExecuTorchRuntime } from './executorch.js';
 import { OnnxRuntimeWeb } from './onnx-runtime.js';
 import { OnnxRuntimeMobile } from './onnx-mobile.js';

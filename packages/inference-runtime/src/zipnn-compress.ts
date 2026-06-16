@@ -43,9 +43,6 @@ export class ZipNNCompressor {
 
     const minValue = Math.min(...data);
     const maxValue = Math.max(...data);
-    const minBits = new Int32Array([minValue]);
-    const maxBits = new Int32Array([maxValue]);
-
     const metadata: ZipNNMetadata = {
       blockSize: this.config.blockSize,
       quantBits: this.config.quantBits,
