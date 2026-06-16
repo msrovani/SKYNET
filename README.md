@@ -4,8 +4,8 @@
 
 [![CI](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml/badge.svg)](https://github.com/msrovani/SKYNET/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.9.1-green.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-395%20passing-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/version-0.13.0-green.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-570%20passing-brightgreen.svg)]()
 
 ---
 
@@ -360,11 +360,11 @@ Sprint 10 ████████████████████ 100%  Int
 | Componente | Estado |
 |-----------|--------|
 | `pnpm install` + `pnpm build` | ✅ 8/8 packages |
-| `pnpm test` | ✅ 395 testes passam (41 core-wasm + 47 blockchain + 43 inference + 21 desktop + 167 p2p + 37 tee + 7 app-ui + 32 fl) |
-| WebTransport echo demo (`pnpm example:echo`) | ✅ QUIC ~170ms, roundtrip ~15ms |
+| `pnpm test` | ✅ 570 testes passam (41 core-wasm + 69 blockchain + 121 inference + 21 desktop + 214 p2p + 51 tee + 7 app-ui + 46 fl) |
+| ZipNN Lossless Compression (código + testes) | ✅ 8 testes (block quantization 2-8 bit, auto-compress downloads) |
+| Distributed Speculative Decoding (DSD) mesh | ✅ 9 testes DSD + 11 testes p2p (draft/verify/acceptance stats) |
 | Pipeline Parallelism (código + testes) | ✅ Layer partition por capacidade |
 | Segment Means compression (código + testes) | ✅ Compressão lossy de ativações |
-| Distributed Speculative Decoding (código + testes) | ✅ 11 testes (draft, verify, rejection) |
 | Sharded Inference Pipeline (código + testes) | ✅ 11 testes (plan, memory, KV cache) |
 | Activation Checkpoints (código + testes) | ✅ Preemption/recovery |
 | Thermal Management (código + testes) | ✅ 30 testes (zone/trend/cooldown/shift) |
@@ -408,10 +408,12 @@ Sprint 10 ████████████████████ 100%  Int
 | **Web App UI build** | ✅ Sprint 10 |
 | **WebTransport E2E real entre 2 peers** | ✅ Sprint 10 |
 | **E2E cross-package integration tests** | ✅ Sprint 10 |
+| **DSD mesh deployment** | ✅ Sprint 14.6 (deploy script + metrics) |
+| **ZipNN model compression auto-download** | ✅ Sprint 14.6 (automático para >50MB) |
 | **Beta fechado (early adopters)** | Sprint 11 |
 | **Beta público instalável** | Sprint 11 |
 
-> **⚠️ SKYNET está em desenvolvimento ativo (Alpha).** Código funcional, testado e buildável — 395 testes, 8/8 packages, Web App UI funcional. Se és developer ou early adopter, mergulha em [github.com/msrovani/SKYNET](https://github.com/msrovani/SKYNET).
+> **⚠️ SKYNET está em desenvolvimento ativo (Alpha).** Código funcional, testado e buildável — 570 testes, 8/8 packages, Web App UI funcional. Se és developer ou early adopter, mergulha em [github.com/msrovani/SKYNET](https://github.com/msrovani/SKYNET).
 
 ## Quick Start (cross-platform)
 
@@ -432,7 +434,12 @@ pnpm --filter @skynet/p2p-mesh-network example:setup
 pnpm --filter @skynet/p2p-mesh-network example:echo
 # → Connected in ~120ms, Echo in ~3ms
 
-# 4. App UI Web (Next.js)
+# 4. DSD Distributed Speculative Decoding Mesh
+pnpm --filter @skynet/p2p-mesh-network example:setup
+pnpm --filter @skynet/p2p-mesh-network dsd:mesh
+# → Metrics: http://127.0.0.1:xxxx (monitor acceptance rate, TPS)
+
+# 5. App UI Web (Next.js)
 pnpm --filter @skynet/app-ui-orchestrator build:web
 ```
 

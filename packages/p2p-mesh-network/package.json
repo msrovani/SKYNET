@@ -23,7 +23,8 @@
     "example:echo": "tsx scripts/run-echo.ts",
     "example:mesh:server": "tsx scripts/mesh-server.ts",
     "example:mesh:client": "tsx scripts/mesh-client.ts",
-    "example:mesh": "tsx scripts/run-mesh.ts"
+    "example:mesh": "tsx scripts/run-mesh.ts",
+    "dsd:mesh": "tsx scripts/run-dsd-mesh.ts"
   },
   "dependencies": {
     "@automerge/automerge": "^3.0.0",
