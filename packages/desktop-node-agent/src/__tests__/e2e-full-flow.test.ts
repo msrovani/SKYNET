@@ -95,10 +95,10 @@ describe('E2E: TEE Attestation', () => {
 
 describe('E2E: Inference + Model Loading', () => {
   it('estimates memory and configures pipeline', async () => {
-    const { estimateMemory } = await import('@skynet/inference-runtime');
+    const { estimateMemoryExecuTorch } = await import('@skynet/inference-runtime');
     const { ModelLoader } = await import('@skynet/inference-runtime');
 
-    const mem = estimateMemory(1_000_000_000, 'int4');
+    const mem = estimateMemoryExecuTorch(1_000_000_000, 'int4');
     expect(mem).toBeGreaterThan(0);
     expect(mem).toBeLessThan(1000);
 

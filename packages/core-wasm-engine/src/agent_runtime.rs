@@ -2,6 +2,7 @@ use js_sys;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentConfig {
     pub agent_id: String,
     pub model_id: String,
@@ -12,12 +13,14 @@ pub struct AgentConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentInput {
     pub prompt: String,
     pub context: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentOutput {
     pub agent_id: String,
     pub content: String,
@@ -28,6 +31,7 @@ pub struct AgentOutput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ToolCall {
     pub tool: String,
     pub input: String,

@@ -9,3 +9,8 @@ export {
 export {
   ZkFlVerifier, type ZkVerifyConfig, type ZkVerificationResult,
 } from './zk-fl-verifier.js';
+export { FedLAGC, type DeviceCapability, type SubmodelConfig } from './fed-lagc.js';
+export {
+  LVSAVerifier, InnerProductVerifier,
+  type MaskedGradient, type AggregationProof,
+} from './secure-aggregation.js';

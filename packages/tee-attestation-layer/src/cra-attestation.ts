@@ -61,7 +61,7 @@ export class CRACollectiveAttestation {
     const now = Date.now();
     const suspiciousNodes: string[] = [];
     let trustedCount = 0;
-    for (const [, node] of this.nodes) {
+    for (const [, node] of [...this.nodes]) {
       if (now - node.lastAttested > this.VERIFICATION_INTERVAL_MS * 2) {
         node.status = 'suspicious';
         suspiciousNodes.push(node.nodeId);

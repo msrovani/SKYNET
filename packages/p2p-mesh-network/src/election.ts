@@ -1,6 +1,6 @@
 import { CrdtSync } from './crdt-sync.js';
 import { TransportManager } from './transport.js';
-import { NodeCapability, NodeRole, computeScore, isL3Candidate, deriveRole } from './capability.js';
+import { NodeCapability, NodeRole, computeScore, deriveRole } from './capability.js';
 
 export type ElectionEvent = 'promoted' | 'demoted' | 'elected_l3' | 'l3_lost';
 
@@ -59,7 +59,9 @@ export class RoleElection {
         score: computeScore(this.localCap),
         role: this.localRole,
       }));
-      this.transport.send(capData, peerId).catch(() => {});
+      this.transport.send(capData, peerId).catch((err) => {
+        console.debug('[SKYNET] Capability send failed (peer may be gone):', err);
+      });
     }
   }
 
@@ -117,7 +119,9 @@ export class RoleElection {
         this.transport.send(
           new TextEncoder().encode(JSON.stringify({ type: 'l3_heartbeat', id: '__local__' })),
           peerId,
-        ).catch(() => {});
+        ).catch((err) => {
+          console.debug('[SKYNET] L3 heartbeat send failed:', err);
+        });
       }
     }, this.HEARTBEAT_L3_MS);
   }

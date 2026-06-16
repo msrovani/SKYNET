@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { PipelineManager } from '../pipeline.js';
-import type { SpeculativeConfig } from '../speculative-decoding.js';
+
 
 function makeMockLogits(vocabSize: number, tokenBias: number[] = []): (tokens: number[]) => Float32Array {
   return (tokens: number[]) => {
@@ -14,21 +13,6 @@ function makeMockLogits(vocabSize: number, tokenBias: number[] = []): (tokens: n
         arr[tokenBias[i]] = 100;
       }
     }
-    return arr;
-  };
-}
-
-function makeMockDraftLogits(vocabSize: number, draftTokens: number[]): (tokens: number[]) => Float32Array {
-  let idx = 0;
-  return (_tokens: number[]) => {
-    const arr = new Float32Array(vocabSize);
-    for (let i = 0; i < vocabSize; i++) {
-      arr[i] = Math.sin(i * 0.1 + idx * 0.3);
-    }
-    if (idx < draftTokens.length) {
-      arr[draftTokens[idx]] = 200;
-    }
-    idx++;
     return arr;
   };
 }

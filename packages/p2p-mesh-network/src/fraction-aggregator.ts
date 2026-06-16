@@ -1,5 +1,8 @@
 import { blake3Checksum } from '@skynet/core-wasm-engine';
 
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+
 export interface AgentFraction {
   subTaskId: string;
   agentId: string;
@@ -77,7 +80,7 @@ export class FractionAggregator {
 
   private emit(event: AggregatorEvent, data: any): void {
     for (const cb of this.callbacks) {
-      try { cb(event, data); } catch {}
+      try { cb(event, data); } catch { /* ignore handler errors */ }
     }
   }
 
@@ -175,8 +178,8 @@ export class FractionAggregator {
     const html = fractions.find(f => f.artifact.mimeType === 'text/html');
     const css = fractions.find(f => f.artifact.mimeType === 'text/css');
     if (html && css) {
-      const htmlStr = new TextDecoder().decode(html.artifact.data);
-      const cssStr = new TextDecoder().decode(css.artifact.data);
+      const htmlStr = textDecoder.decode(html.artifact.data);
+      const cssStr = textDecoder.decode(css.artifact.data);
       const htmlClasses = htmlStr.match(/class="([^"]+)"/g) || [];
       const cssSelectors = cssStr.match(/\.([a-zA-Z][\w-]*)/g) || [];
       const classNames = htmlClasses.map(c => c.replace(/class="/, '').replace(/"$/, ''));
@@ -190,7 +193,7 @@ export class FractionAggregator {
 
   private mergeArtifacts(fractions: AgentFraction[]): { mimeType: string; data: Uint8Array } {
     if (fractions.length === 0) {
-      return { mimeType: 'text/plain', data: new TextEncoder().encode('') };
+      return { mimeType: 'text/plain', data: textEncoder.encode('') };
     }
 
     const htmlFracs = fractions.filter(f => f.artifact.mimeType === 'text/html');
@@ -201,34 +204,36 @@ export class FractionAggregator {
 
     if (htmlFracs.length > 0 || cssFracs.length > 0) {
       const head = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>SKYNET Generated</title><style>';
-      const styles = cssFracs.map(f => new TextDecoder().decode(f.artifact.data)).join('\n');
+      const styles = cssFracs.map(f => textDecoder.decode(f.artifact.data)).join('\n');
       const mid = '</style></head><body>';
       const bodies = htmlFracs.map(f => {
-        let body = new TextDecoder().decode(f.artifact.data);
+        let body = textDecoder.decode(f.artifact.data);
         body = body.replace(/<!DOCTYPE html>.*?<body[^>]*>/is, '').replace(/<\/body>.*/is, '').trim();
         return body;
       }).join('\n');
       const foot = '</body></html>';
       const merged = head + styles + mid + bodies + foot;
-      return { mimeType: 'text/html', data: new TextEncoder().encode(merged) };
+      return { mimeType: 'text/html', data: textEncoder.encode(merged) };
     }
 
     if (jsonFracs.length > 0) {
       const merged: Record<string, any> = {};
       for (const f of jsonFracs) {
         try {
-          Object.assign(merged, JSON.parse(new TextDecoder().decode(f.artifact.data)));
-        } catch {}
+          Object.assign(merged, JSON.parse(textDecoder.decode(f.artifact.data)));
+        } catch (err) {
+          console.warn('[SKYNET] Invalid JSON fraction from agent:', f.agentId, err);
+        }
       }
-      return { mimeType: 'application/json', data: new TextEncoder().encode(JSON.stringify(merged, null, 2)) };
+      return { mimeType: 'application/json', data: textEncoder.encode(JSON.stringify(merged, null, 2)) };
     }
 
     if (imageFracs.length > 0) {
       return { mimeType: imageFracs[0].artifact.mimeType, data: imageFracs[0].artifact.data };
     }
 
-    const text = textFracs.map(f => new TextDecoder().decode(f.artifact.data)).join('\n\n');
-    return { mimeType: 'text/markdown', data: new TextEncoder().encode(text) };
+    const text = textFracs.map(f => textDecoder.decode(f.artifact.data)).join('\n\n');
+    return { mimeType: 'text/markdown', data: textEncoder.encode(text) };
   }
 
   getFractions(subTaskId: string): AgentFraction[] {

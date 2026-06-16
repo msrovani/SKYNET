@@ -1,4 +1,4 @@
-import { AgentRuntime, AgentConfig, AgentInput, AgentOutput, AgentState, AGENT_TEMPLATES, createAgentFromTemplate } from '@skynet/core-wasm-engine';
+import { AgentRuntime, AgentInput, AgentOutput, AGENT_TEMPLATES, createAgentFromTemplate } from '@skynet/core-wasm-engine';
 
 export interface AgentHostConfig {
   maxAgents: number;

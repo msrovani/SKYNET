@@ -1,6 +1,5 @@
 import { PolygonAdapter, ArbitrumAdapter } from './chain-adapters.js';
 import type { ChainQuote, ChainReceipt } from './chain-adapters.js';
-import { generateReference } from './chain-adapters.js';
 
 export interface ChainRoute {
   chainId: number;

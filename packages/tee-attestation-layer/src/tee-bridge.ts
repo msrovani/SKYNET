@@ -1,4 +1,5 @@
 import { type TeeProvider } from './attestation.js';
+import { GpuCcAttestation } from './gpu-cc-attestation.js';
 
 export type TeeType = TeeProvider | 'none';
 
@@ -97,6 +98,19 @@ export class TeeBridge {
           version: '1.0',
         };
       }
+    }
+
+    const gpuCcPlatforms = GpuCcAttestation.detectPlatforms();
+    if (gpuCcPlatforms.length > 0) {
+      return {
+        available: true,
+        type: 'sgx',
+        gpuSupport: true,
+        maxMemoryMb: 4096,
+        attestationSupported: true,
+        secureStorage: true,
+        version: '2.1',
+      };
     }
 
     return {

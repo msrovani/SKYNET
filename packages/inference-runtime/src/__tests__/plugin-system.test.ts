@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ModelPluginCard, PluginValidation } from '../plugin-types.js';
+import type { ModelPluginCard } from '../plugin-types.js';
 
 function makeCard(overrides: Partial<ModelPluginCard> & { id?: string }): ModelPluginCard {
   return {

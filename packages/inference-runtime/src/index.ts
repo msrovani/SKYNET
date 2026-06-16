@@ -5,7 +5,7 @@ export {
   ExecuTorchRuntime,
   getAvailableBackends,
   recommendBackend,
-  estimateMemory,
+  estimateMemory as estimateMemoryExecuTorch,
   type ExecuTorchConfig,
   type ExecuTorchBackend,
   type ExecuTorchTensor,
@@ -13,17 +13,19 @@ export {
   type InferenceResult,
   type ModelMetadata,
 } from './executorch.js';
-export { MLXRuntime } from './mlx.js';
+export { MLXRuntime, supportsDelegate } from './mlx.js';
 export { OnnxRuntimeWeb } from './onnx-runtime.js';
 export { OnnxRuntimeMobile, type MobileBackend } from './onnx-mobile.js';
 export {
   ModelLoader,
   KNOWN_MODELS,
+  DynamicPrecisionController,
   estimateMemory as modelEstimateMemory,
   type ModelConfig,
   type ModelProvider,
   type Quantization,
   type DownloadProgress,
+  MatQuantEncoder,
 } from './model-loader.js';
 export {
   PluginRegistry, type RegistryEvent, type RegistryEventType, type RegistryCallback,
@@ -49,3 +51,7 @@ export {
   type WebGpuShaderConfig, type ShaderType,
   type WebGpuAdapterInfo, type PreprocessResult,
 } from './webgpu-preprocess.js';
+export {
+  LMCacheP2P, DroidSpeakKVSharing, KVCompress,
+  type P2PKVCacheEntry, type PeerKVCacheOffer, type RegistryTreeNode,
+} from './kv-cache.js';

@@ -1,11 +1,19 @@
 import { AutoConfig, type AutoModelConfig } from './auto-config.js';
-import { LLaMACppRuntime, type LLaMACppConfig } from './llamacpp.js';
-import { ExecuTorchRuntime, type InferenceResult } from './executorch.js';
+import { LLaMACppRuntime, type LLaMACppConfig, type LLaMAGenerateResult } from './llamacpp.js';
+import { ExecuTorchRuntime } from './executorch.js';
 import { OnnxRuntimeWeb } from './onnx-runtime.js';
 import { OnnxRuntimeMobile } from './onnx-mobile.js';
 import { CoreMLRuntime } from './coreml.js';
 import { MLXRuntime } from './mlx.js';
 import { simpleTokenize } from './tokenizer.js';
+
+interface InferenceResult {
+  tokens: number[];
+  probabilities?: Float32Array[];
+  targetTokens?: number[];
+  timings?: { prefillMs: number; decodeMs: number; totalMs: number; tokensPerSecond: number };
+  memoryUsedMb?: number;
+}
 
 export interface ToolAdapter {
   name: string;
@@ -177,7 +185,7 @@ export class AgentModel {
 
   async generate(prompt: string, context: string[] = []): Promise<AgentTurnResult> {
     const fullPrompt = this.buildPrompt(prompt, context);
-    const start = Date.now();
+    const start = performance.now();
     let content: string;
     let inferenceResult: InferenceResult | undefined;
 
@@ -210,7 +218,8 @@ export class AgentModel {
       } catch { content = randomPortugueseResponse(prompt); }
     } else if (this.activeBackend === 'mlx' && this.mlx) {
       try {
-        content = await this.mlx.infer(fullPrompt, this.config.maxTokens);
+        const result = await this.mlx.infer(fullPrompt, this.config.maxTokens);
+        content = typeof result === 'string' ? result : result.content;
       } catch { content = randomPortugueseResponse(prompt); }
     } else {
       content = randomPortugueseResponse(prompt);
@@ -224,7 +233,66 @@ export class AgentModel {
       }
     }
 
-    return { content, toolCalls, inferenceResult, latencyMs: Date.now() - start };
+    return { content, toolCalls, inferenceResult, latencyMs: performance.now() - start };
+  }
+
+  async generateWithDSD(prompt: string, context: string[] = []): Promise<AgentTurnResult> {
+    const fullPrompt = this.buildPrompt(prompt, context);
+    const start = performance.now();
+    let content: string;
+    let inferenceResult: InferenceResult | undefined;
+
+    if (this.activeBackend === 'llamacpp' && this.llamacpp && this.autoConfig?.modelPath) {
+      const result = await this.llamacpp.generate(fullPrompt, this.config.maxTokens, true);
+      content = result.content;
+      inferenceResult = result.inferenceResult;
+    } else if (this.activeBackend === 'executorch' && this.executorch) {
+      const result = await this.executorch.infer(simpleTokenize(fullPrompt));
+      content = result.tokens.join(' ');
+      inferenceResult = result;
+    } else if (this.activeBackend === 'onnx-web' && this.onnxWeb) {
+      try {
+        const tokens = simpleTokenize(fullPrompt);
+        const input = new Float32Array(tokens.map(t => Math.min(t / 32000, 1)));
+        const output = await this.onnxWeb.infer(input, [1, tokens.length]);
+        content = decodeTokens(Array.from(output.slice(0, 256)).map(v => Math.floor(v * 32000)));
+      } catch { content = randomPortugueseResponse(prompt); }
+    } else if (this.activeBackend === 'onnx-mobile' && this.onnxMobile) {
+      try {
+        const result = await this.onnxMobile.infer(simpleTokenize(fullPrompt));
+        content = result.tokens.join(' ');
+        inferenceResult = result;
+      } catch { content = randomPortugueseResponse(prompt); }
+    } else if (this.activeBackend === 'coreml' && this.coreml) {
+      try {
+        const tokens = simpleTokenize(fullPrompt);
+        const input = new Float32Array(tokens.map(t => Math.min(t / 32000, 1)));
+        const result = await this.coreml.infer(input, [1, tokens.length]);
+        content = decodeTokens(Array.from(result.output.slice(0, 256)).map(v => Math.floor(v * 32000)));
+      } catch { content = randomPortugueseResponse(prompt); }
+    } else if (this.activeBackend === 'mlx' && this.mlx) {
+      try {
+        const result = await this.mlx.infer(fullPrompt, this.config.maxTokens, true);
+        if (typeof result === 'object') {
+          content = result.content;
+          inferenceResult = result.inferenceResult;
+        } else {
+          content = result as string;
+        }
+      } catch { content = randomPortugueseResponse(prompt); }
+    } else {
+      content = randomPortugueseResponse(prompt);
+    }
+
+    const toolCalls = this.detectToolCalls(content);
+    if (toolCalls.length > 0) {
+      for (const tc of toolCalls) {
+        const tool = this.config.tools.find(t => t.name === tc.tool);
+        if (tool) tc.output = await Promise.resolve(tool.execute(tc.input));
+      }
+    }
+
+    return { content, toolCalls, inferenceResult, latencyMs: performance.now() - start };
   }
 
   private buildPrompt(prompt: string, context: string[]): string {

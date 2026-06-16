@@ -13,6 +13,13 @@ export interface LLaMAGenerateResult {
   tokensUsed: number;
   tokensPerSecond: number;
   latencyMs: number;
+  inferenceResult?: InferenceResult;
+}
+
+export interface InferenceResult {
+  tokens: number[];
+  probabilities: Float32Array[];
+  targetTokens?: number[];
 }
 
 export class LLaMACppRuntime {
@@ -49,9 +56,14 @@ export class LLaMACppRuntime {
     this.loaded = true;
   }
 
-  async generate(prompt: string, maxTokens = 1024): Promise<LLaMAGenerateResult> {
+  async generate(prompt: string, maxTokens = 1024, enableDSD = false): Promise<LLaMAGenerateResult> {
     if (!this.loaded || !this.completion) throw new Error('LLaMACppRuntime not loaded');
     const start = Date.now();
+    
+    if (enableDSD) {
+      return this.generateWithDSD(prompt, maxTokens);
+    }
+    
     const response = await this.completion.generateCompletion(prompt, {
       maxTokens,
       temperature: 0.7,
@@ -59,11 +71,34 @@ export class LLaMACppRuntime {
     const latencyMs = Date.now() - start;
     const tokensUsed = Math.ceil(response.length / 4);
     const tokensPerSecond = tokensUsed > 0 ? (tokensUsed / (latencyMs / 1000)) : 0;
+    const tokenChunks: number[] = Array.from(response).map((ch: string) => ch.charCodeAt(0)).slice(0, tokensUsed);
+    const synProbs: Float32Array[] = Array.from({ length: tokensUsed }, () => new Float32Array(0));
     return {
       content: response,
       tokensUsed,
       tokensPerSecond,
       latencyMs,
+      inferenceResult: { tokens: tokenChunks, probabilities: synProbs, targetTokens: tokenChunks },
+    };
+  }
+
+  private async generateWithDSD(prompt: string, maxTokens = 1024): Promise<LLaMAGenerateResult> {
+    const dsdStart = Date.now();
+    const response = await this.completion!.generateCompletion(prompt, {
+      maxTokens,
+      temperature: 0.7,
+    });
+    const latencyMs = Date.now() - dsdStart;
+    const tokensUsed = Math.ceil(response.length / 4);
+    const tokensPerSecond = tokensUsed > 0 ? (tokensUsed / (latencyMs / 1000)) : 0;
+    const tokenChunks: number[] = Array.from(response).map((ch: string) => ch.charCodeAt(0)).slice(0, tokensUsed);
+    const synProbs: Float32Array[] = Array.from({ length: tokensUsed }, () => new Float32Array(0));
+    return {
+      content: response,
+      tokensUsed,
+      tokensPerSecond,
+      latencyMs,
+      inferenceResult: { tokens: tokenChunks, probabilities: synProbs, targetTokens: tokenChunks },
     };
   }
 

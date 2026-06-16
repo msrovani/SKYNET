@@ -54,7 +54,7 @@ export class FedYogi {
         (1 - this.config.beta1) * avgUpdate[i];
       const g = avgUpdate[i];
       const g2 = g * g;
-      this.state.variance[i] -= (1 - this.config.beta2) * g2 * Math.sign(this.state.variance[i] - g2);
+      this.state.variance[i] -= (1 - this.config.beta2) * g2 * (Math.sign(this.state.variance[i] - g2) || 1);
     }
     const result = new Array(numParams);
     for (let i = 0; i < numParams; i++) {

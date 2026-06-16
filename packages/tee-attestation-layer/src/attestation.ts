@@ -29,7 +29,7 @@ export interface AttestationReport {
   simulated: boolean;
 }
 
-export interface VerificationResult {
+export interface AttestationVerificationResult {
   verified: boolean;
   timestamp: number;
   reportHash: string;
@@ -81,7 +81,7 @@ export class AttestationManager {
     return report;
   }
 
-  async verifyReport(report: AttestationReport): Promise<VerificationResult> {
+  async verifyReport(report: AttestationReport): Promise<AttestationVerificationResult> {
     if (report.simulated) {
       const valid = report.measurement.length === 64 && report.nonce.length > 0;
       return {

@@ -14,10 +14,6 @@
   "dependencies": {
     "@skynet/blockchain-client": "workspace:*",
     "@skynet/core-wasm-engine": "workspace:*",
-    "@skynet/fl-training-client": "workspace:*",
-    "@skynet/inference-runtime": "workspace:*",
-    "@skynet/p2p-mesh-network": "workspace:*",
-    "@skynet/tee-attestation-layer": "workspace:*",
     "next": "^15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

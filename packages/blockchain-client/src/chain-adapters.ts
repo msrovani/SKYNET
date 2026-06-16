@@ -1,4 +1,4 @@
-import type { PaymentQuote, PaymentReceipt, PaymentStatus } from './solana-x402.js';
+import type { PaymentStatus } from './solana-x402.js';
 
 const MATIC_USD_PRICE = 0.60;
 

@@ -2,7 +2,7 @@ export {
   AttestationManager,
   type AttestationConfig,
   type AttestationReport,
-  type VerificationResult,
+  type AttestationVerificationResult,
   type PlatformInfo,
   type TeeProvider,
 } from './attestation.js';
@@ -43,3 +43,11 @@ export {
 export {
   KeylimeContinuousAttestation, type KeylimeConfig, type KeylimeMeasurement, type KeylimeVerificationResult,
 } from './keylime-attestation.js';
+
+export {
+  GpuCcAttestation,
+  type GpuCcPlatform,
+  type GpuCcAttestationStatus,
+  type GpuEvidence,
+  type GpuAttestationConfig,
+} from './gpu-cc-attestation.js';

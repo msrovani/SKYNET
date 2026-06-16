@@ -7,6 +7,7 @@ export class OnnxRuntimeWeb {
   async load(modelPath: string): Promise<void> {
     this.modelPath = modelPath;
     try {
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval -- optional native dep (ADR 22)
       this.ort = await Function('return import("onnxruntime-web")')() as any;
       this.session = await this.ort.InferenceSession.create(modelPath, {
         executionProviders: ['webgpu', 'webgl', 'wasm'],

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AgentModel } from '../agent-model.js';
-import type { ToolAdapter, AgentModelConfig } from '../agent-model.js';
+import type { ToolAdapter } from '../agent-model.js';
 
 describe('AgentModel', () => {
   const tools: ToolAdapter[] = [
@@ -69,7 +69,6 @@ describe('AgentModel', () => {
   });
 
   it('handles multiple tool calls', () => {
-    const content = 'Use [html-renderer: Hello World] and [text-generator: Summary]';
     const cfg = agent.getConfig();
     expect(cfg.tools.length).toBe(2);
   });

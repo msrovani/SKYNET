@@ -79,10 +79,11 @@ export class ModelLoader {
     const response = await fetch(config.modelUrl, { signal: controller.signal });
     clearTimeout(timeout);
     if (!response.ok) throw new Error(`Failed to load model ${config.id}: ${response.status}`);
+    if (!response.body) throw new Error('Response body not available for streaming download');
 
     const contentLength = response.headers.get('content-length');
     const total = contentLength ? parseInt(contentLength, 10) : 0;
-    const reader = response.body!.getReader();
+    const reader = response.body.getReader();
     const chunks: Uint8Array[] = [];
     let loaded = 0;
 
@@ -184,9 +185,12 @@ export class MatQuantEncoder {
       const end = Math.min(start + bs, n);
       let min = Infinity, max = -Infinity;
       for (let i = start; i < end; i++) {
-        if (data[i] < min) min = data[i];
-        if (data[i] > max) max = data[i];
+        const v = data[i];
+        if (!isFinite(v)) continue;
+        if (v < min) min = v;
+        if (v > max) max = v;
       }
+      if (!isFinite(min)) { min = -1; max = 1; }
       const scale = (max - min) < 1e-10 ? 1.0 : (max - min) / 15.0;
       scales[b * 2] = min;
       scales[b * 2 + 1] = scale;

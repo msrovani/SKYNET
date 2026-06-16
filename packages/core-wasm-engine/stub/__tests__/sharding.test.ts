@@ -4,7 +4,6 @@ import {
   shardTensorColwise,
   reconstructTensor,
   verifyTensorShard,
-  type TensorShard,
 } from '../index.js';
 
 function makeMatrix(rows: number, cols: number): Float32Array {

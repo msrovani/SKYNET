@@ -8,7 +8,8 @@
     "build:stub": "tsc",
     "test": "vitest run",
     "dev": "wasm-pack build --dev --target web --out-dir dist",
-    "clean": "wasm-pack clean"
+    "clean": "wasm-pack clean",
+    "lint": "eslint stub/ --ext .ts"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -18,9 +19,6 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
-  },
-  "scripts": {
-    "lint": "eslint stub/ --ext .ts"
   },
   "devDependencies": {
     "wasm-pack": "^0.13.0",

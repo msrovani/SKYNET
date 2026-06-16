@@ -18,10 +18,7 @@
     "test": "vitest run",
     "lint": "eslint src/ test/ --ext .ts"
   },
-  "dependencies": {
-    "@skynet/inference-runtime": "workspace:*",
-    "@skynet/core-wasm-engine": "workspace:*"
-  },
+  "dependencies": {},
   "devDependencies": {
     "typescript": "^5.4.0",
     "vitest": "^1.6.0",

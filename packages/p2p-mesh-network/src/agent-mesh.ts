@@ -1,5 +1,5 @@
-import { SemanticRouter, AgentRegistration, SubTask, type RouterEvent, type RouterCallback } from './semantic-router.js';
-import { VCapabilityVector, embedText } from './capability.js';
+import { SemanticRouter, AgentRegistration, SubTask } from './semantic-router.js';
+import { embedText } from './capability.js';
 
 export interface AgentHeartbeat {
   agentId: string;
@@ -51,7 +51,7 @@ export class AgentMeshManager {
 
   private emit(event: MeshManagerEvent, data: any): void {
     for (const cb of this.callbacks) {
-      try { cb(event, data); } catch {}
+      try { cb(event, data); } catch { /* ignore handler errors */ }
     }
   }
 
@@ -168,7 +168,7 @@ export class AgentMeshManager {
 
     this.heartbeatInterval = setInterval(() => {
       const now = Date.now();
-      for (const [agentId, health] of this.health) {
+      for (const [agentId, health] of [...this.health]) {
         const elapsed = now - health.lastHeartbeat;
         if (elapsed > this.HEARTBEAT_TIMEOUT_MS) {
           health.missedHeartbeats++;

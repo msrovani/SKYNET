@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Switch, FlatList,
+  View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Switch,
 } from 'react-native';
 import { useSkynet } from '../../shared/hooks/useSkynet.js';
 import {

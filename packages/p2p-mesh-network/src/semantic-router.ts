@@ -1,4 +1,4 @@
-import { VCapabilityVector, cosineSimilarity, embedText } from './capability.js';
+import { cosineSimilarity, embedText } from './capability.js';
 
 export interface AgentRegistration {
   agentId: string;
@@ -47,7 +47,7 @@ export class HnswIndex {
     return this.efSearch;
   }
 
-  adaptiveEf(query: Float32Array, k: number): number {
+  adaptiveEf(_query: Float32Array, _k: number): number {
     if (this.queryHistory.length < 10) return this.efSearch;
     const recentSims = this.queryHistory.slice(-10);
     const avgSim = recentSims.reduce((s, r) => s + r.sim, 0) / recentSims.length;
@@ -195,7 +195,7 @@ export class SemanticRouter {
 
   recordRoutingSuccess(subtaskId: string, agentId: string, queryEmbedding: Float32Array): void {
     this.successHistory.set(agentId, (this.successHistory.get(agentId) || 0) + 1);
-    this.queryVectors.set(`${agentId}_${subtaskId}`, queryEmbedding);
+    this.queryVectors.set(`${agentId}/${subtaskId}`, queryEmbedding);
     if (this.queryVectors.size > 500) {
       const first = this.queryVectors.keys().next().value;
       if (first) this.queryVectors.delete(first);
@@ -211,8 +211,8 @@ export class SemanticRouter {
     const reliability = Math.min(1, successes / 10);
     const semantic = 0.5 + reliability * 0.15;
     const tool = 0.3 + reliability * 0.1;
-    const cost = 0.1 - reliability * 0.15;
-    const latency = 0.1 - reliability * 0.1;
+    const cost = Math.max(0.01, 0.1 - reliability * 0.09);
+    const latency = Math.max(0.01, 0.1 - reliability * 0.09);
     const total = semantic + tool + cost + latency;
     return {
       semantic: semantic / total,
@@ -229,7 +229,7 @@ export class SemanticRouter {
 
   private emit(event: RouterEvent, data: any): void {
     for (const cb of this.callbacks) {
-      try { cb(event, data); } catch {}
+      try { cb(event, data); } catch { /* ignore handler errors */ }
     }
   }
 

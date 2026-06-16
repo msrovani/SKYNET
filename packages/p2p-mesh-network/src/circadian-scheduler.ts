@@ -79,7 +79,6 @@ export class CircadianScheduler {
     if (night) {
       circadianScore = 1.0;
     } else if (localHour >= 6 && localHour < 18) {
-      const dayProgress = (localHour - 6) / 12;
       const peakDist = Math.abs(localHour - this.config.peakSolarHour);
       circadianScore = Math.max(0.2, 1.0 - peakDist * 0.06);
     } else {
@@ -113,7 +112,7 @@ export class CircadianScheduler {
       .map(({ peer }) => peer);
   }
 
-  getNightDuration(timezoneOffset: number): number {
+  getNightDuration(_timezoneOffset: number): number {
     const start = this.config.nightStartHour;
     const end = this.config.nightEndHour;
     if (start <= end) return end - start;

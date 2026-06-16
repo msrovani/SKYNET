@@ -1,4 +1,3 @@
-import type { NodeCapability } from './capability.js';
 
 export interface Observation {
   nodeId: string;

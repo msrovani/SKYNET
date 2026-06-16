@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   AgentRuntime,
   createAgentFromTemplate,
   AGENT_TEMPLATES,
 } from '../index.js';
-import type { AgentConfig, AgentInput } from '../index.js';
+import type { AgentInput } from '../index.js';
 
 describe('AgentRuntime', () => {
   let agent: AgentRuntime;

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
 
 
-export type ExecuTorchBackend = 'xnnpack' | 'vulkan' | 'qnn' | 'coreml' | 'mps';
+export type ExecuTorchBackend = 'xnnpack' | 'vulkan' | 'qnn' | 'coreml' | 'mps' | 'mlx';
 
 export interface ExecuTorchConfig {
   modelPath: string;
@@ -71,6 +71,10 @@ function getAvailableBackendsReal(): ExecuTorchBackend[] {
       try { execSync('sysctl -n machdep.cpu.brand_string', { stdio: 'pipe', timeout: 1000 });
         backends.push('mps', 'coreml');
       } catch { backends.push('mps'); }
+      try {
+        execSync('python3 -c "import mlx; print(mlx.__version__)"', { stdio: 'pipe', timeout: 3000 });
+        backends.push('mlx');
+      } catch { /* mlx not installed */ }
     }
     if (process.platform === 'linux') {
       try {
@@ -99,7 +103,9 @@ export function getHardwareBackends(): ExecuTorchBackend[] {
   return [...new Set(backends)];
 }
 
-export function recommendBackend(deviceMemoryGb: number, isMobile: boolean): ExecuTorchBackend {
+export function recommendBackend(deviceMemoryGb: number, isMobile: boolean, osPlatform?: string): ExecuTorchBackend {
+  const platform = osPlatform ?? process.platform;
+  if (platform === 'darwin' && deviceMemoryGb >= 4 && !isMobile) return 'mlx';
   if (deviceMemoryGb >= 8 && !isMobile) return 'xnnpack';
   if (deviceMemoryGb >= 6) return 'vulkan';
   if (isMobile && deviceMemoryGb >= 4) return 'qnn';
@@ -139,6 +145,8 @@ export class ExecuTorchRuntime {
     try {
       const ortPath = resolve(process.cwd(), path);
       if (existsSync(ortPath) || existsSync(resolve(process.cwd(), 'models', path))) {
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval -- optional native dep (ADR 22)
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval -- optional native dep (ADR 22)
         this.onnxOrt = await Function('return import("onnxruntime-node")')() as any;
         const modelFile = existsSync(ortPath) ? ortPath : resolve(process.cwd(), 'models', path);
         this.onnxSession = await this.onnxOrt.InferenceSession.create(modelFile, {

@@ -102,7 +102,7 @@ export class SpeculativeDecoder {
     return this.rngState / 0x7fffffff;
   }
 
-  private getSpeculationLen(stage?: PipelineStage): number {
+  private getSpeculationLen(_stage?: PipelineStage): number {
     if (!this.config.adaptiveSpeculation) return this.config.speculationLen;
     const base = this.config.speculationLen;
     const rate = this.stats.acceptanceRate || this.config.minAcceptanceRate;
@@ -314,7 +314,7 @@ export class SpeculativeDecoder {
     targetLogits: (tokens: number[]) => Float32Array,
     additionalDraftLen: number = 2,
   ): { verification: VerificationResult; additionalDraft: DraftResult | null } {
-    const verifierStart = Date.now();
+    const verifierStart = performance.now();
     const context = [...prefixTokens];
     const acceptedTokens: number[] = [];
     let rejectionPos = draft.speculationLen;
@@ -346,7 +346,7 @@ export class SpeculativeDecoder {
       }
     }
 
-    const elapsed = Date.now() - verifierStart;
+    const elapsed = performance.now() - verifierStart;
     if (elapsed > 10 && additionalDraftLen > 0 && rejectionPos >= draft.speculationLen) {
       additionalContext = this.generateDraftTokens(context, additionalDraftLen, targetLogits);
     }

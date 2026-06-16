@@ -58,12 +58,6 @@ function crc32(data: Uint8Array): number {
   return (crc ^ 0xFFFFFFFF) >>> 0;
 }
 
-function payloadSize(sf: number, bw: number, cr: string): number {
-  const crDenom = parseInt(cr.split('/')[1] ?? '8');
-  const bitsPerSym = Math.pow(2, sf);
-  return Math.floor((bitsPerSym * bw * crDenom) / (8000 * 4)) - 13;
-}
-
 export function estimateLoRaDuration(bytes: number, sf: number, bw: number, cr: string): number {
   const crDenom = parseInt(cr.split('/')[1] ?? '8');
   const symTime = (Math.pow(2, sf) / bw) * 1000;

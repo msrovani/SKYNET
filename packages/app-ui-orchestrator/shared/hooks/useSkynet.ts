@@ -146,7 +146,8 @@ export function useSkynet() {
                 earningsUsd: prev.earningsUsd - 0.001,
               }));
             }
-          } catch {
+          } catch (err) {
+            console.warn('[SKYNET] Payment failed:', err);
             setAppState(prev => ({ ...prev, error: 'Payment failed' }));
           }
         }

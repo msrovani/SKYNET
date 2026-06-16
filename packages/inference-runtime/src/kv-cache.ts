@@ -1,4 +1,4 @@
-export interface KVCacheEntry {
+export interface P2PKVCacheEntry {
   prefixTokens: number[];
   keyCache: Float32Array;
   valueCache: Float32Array;
@@ -17,11 +17,11 @@ export interface RegistryTreeNode {
   nodeId: string;
   prefix: string;
   children: Map<string, RegistryTreeNode>;
-  entries: KVCacheEntry[];
+  entries: P2PKVCacheEntry[];
 }
 
 export class LMCacheP2P {
-  private localCache: Map<string, KVCacheEntry> = new Map();
+  private localCache: Map<string, P2PKVCacheEntry> = new Map();
   private peerOffers: Map<string, PeerKVCacheOffer[]> = new Map();
   private registryTree: RegistryTreeNode;
   private readonly MAX_LOCAL_ENTRIES = 100;
@@ -30,7 +30,7 @@ export class LMCacheP2P {
     this.registryTree = { nodeId: 'root', prefix: '', children: new Map(), entries: [] };
   }
 
-  addLocalEntry(key: string, entry: KVCacheEntry): void {
+  addLocalEntry(key: string, entry: P2PKVCacheEntry): void {
     if (this.localCache.size >= this.MAX_LOCAL_ENTRIES) {
       const first = this.localCache.keys().next().value;
       if (first) this.localCache.delete(first);
@@ -39,7 +39,7 @@ export class LMCacheP2P {
     this.insertIntoTree(key, entry);
   }
 
-  getLocalEntry(key: string): KVCacheEntry | undefined {
+  getLocalEntry(key: string): P2PKVCacheEntry | undefined {
     return this.localCache.get(key);
   }
 
@@ -64,7 +64,7 @@ export class LMCacheP2P {
     return best;
   }
 
-  private insertIntoTree(key: string, entry: KVCacheEntry): void {
+  private insertIntoTree(key: string, entry: P2PKVCacheEntry): void {
     let node = this.registryTree;
     for (let i = 0; i < Math.min(key.length, 4); i++) {
       const char = key[i];
@@ -77,7 +77,7 @@ export class LMCacheP2P {
     if (node.entries.length > 10) node.entries.shift();
   }
 
-  searchByPrefix(prefix: string): KVCacheEntry[] {
+  searchByPrefix(prefix: string): P2PKVCacheEntry[] {
     let node = this.registryTree;
     for (const char of prefix) {
       if (!node.children.has(char)) return [];

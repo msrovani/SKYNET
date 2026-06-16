@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, createWriteStream } from 'node:fs';
+import { existsSync, mkdirSync, createWriteStream, createReadStream } from 'node:fs';
 import { resolve } from 'node:path';
 import { cpus, freemem, totalmem } from 'node:os';
 import { execSync } from 'node:child_process';
+import { createGzip, createGunzip } from 'node:zlib';
 
 export type PlatformType = 'desktop' | 'mobile' | 'tv' | 'unknown';
 
@@ -45,9 +46,9 @@ const MODEL_CATALOG: CatalogEntry[] = [
 function detectCUDADevices(): HardwareDevice[] {
   const devices: HardwareDevice[] = [];
   try {
-    try {
-      const output = execSync('nvidia-smi --query-gpu=name,memory.total --format=csv,noheader', { encoding: 'utf-8', stdio: 'pipe', timeout: 10000 });
-      for (const line of output.trim().split('\n')) {
+    const output = execSync('nvidia-smi --query-gpu=name,memory.total --format=csv,noheader', { encoding: 'utf-8', stdio: 'pipe', timeout: 10000 });
+    for (const line of output.trim().split('\n')) {
+      try {
         const parts = line.split(',');
         if (parts.length >= 2) {
           const name = parts[0].trim();
@@ -55,14 +56,17 @@ function detectCUDADevices(): HardwareDevice[] {
           const vramMB = vramMatch ? parseInt(vramMatch[1]) : 4096;
           devices.push({ type: 'cuda', name, vramMB, backendPriority: 1 });
         }
-      }
-    } catch { return devices; }
-  } catch { /* intentional */ }
+      } catch { /* skip bad line */ }
+    }
+  } catch { /* nvidia-smi not found */ }
   return devices;
 }
 
 function detectWebGPUDevices(): HardwareDevice[] {
-  return [{ type: 'webgpu', name: 'WebGPU', backendPriority: 4 }];
+  if (typeof navigator !== 'undefined' && 'gpu' in navigator && navigator.gpu) {
+    return [{ type: 'webgpu', name: 'WebGPU', backendPriority: 4 }];
+  }
+  return [];
 }
 
 function detectMobileTVHardware(): { platform: PlatformType; cpuCores: number; totalRamMB: number; freeRamMB: number; isMobile: boolean; isTV: boolean } {
@@ -90,12 +94,21 @@ function detectDesktopHW(): { cpuCores: number; freeRamMB: number; totalRamMB: n
   const devices: HardwareDevice[] = [];
   let freeDiskMB = 0;
   try {
-    const df = execSync('wmic logicaldisk get size,freesize,caption', { encoding: 'utf-8', timeout: 3000 });
-    for (const line of df.trim().split('\n').slice(1)) {
-      const m = line.match(/(\w):\s+(\d+)\s+(\d+)/);
-      if (m) {
-        const free = Math.floor(parseInt(m[3]) / (1024 * 1024));
-        if (free > freeDiskMB) freeDiskMB = free;
+    if (process.platform === 'win32') {
+      const df = execSync('wmic logicaldisk get size,freesize,caption', { encoding: 'utf-8', timeout: 3000 });
+      for (const line of df.trim().split('\n').slice(1)) {
+        const m = line.match(/(\w):\s+(\d+)\s+(\d+)/);
+        if (m) {
+          const free = Math.floor(parseInt(m[3]) / (1024 * 1024));
+          if (free > freeDiskMB) freeDiskMB = free;
+        }
+      }
+    } else {
+      const df = execSync('df -k /', { encoding: 'utf-8', timeout: 3000 });
+      const lines = df.trim().split('\n');
+      if (lines.length > 1) {
+        const parts = lines[1].split(/\s+/);
+        freeDiskMB = Math.floor(parseInt(parts[3]) / 1024);
       }
     }
   } catch { freeDiskMB = 50000; }
@@ -106,8 +119,7 @@ function detectDesktopHW(): { cpuCores: number; freeRamMB: number; totalRamMB: n
 }
 
 function isAppleSilicon(): boolean {
-  try { return process.arch === 'arm64' && process.platform === 'darwin'; }
-  catch { return false; }
+  return process.arch === 'arm64' && process.platform === 'darwin';
 }
 
 function detectAppleDevices(_totalRamMB?: number): HardwareDevice[] {
@@ -145,30 +157,100 @@ export class AutoConfig {
     if (!entry) return null;
     const modelsDir = resolve(process.cwd(), 'models');
     mkdirSync(modelsDir, { recursive: true });
+    
+    const compressedModelPath = resolve(modelsDir, `${entry.hfFile}.zip`);
     const modelPath = resolve(modelsDir, entry.hfFile);
+    
+    if (existsSync(compressedModelPath)) {
+      console.log(`Found compressed model ${entry.hfFile}.zip, decompressing...`);
+      await AutoConfig.decompressModel(compressedModelPath, modelPath);
+      return modelPath;
+    }
+    
     if (existsSync(modelPath)) return modelPath;
+    
     const url = `https://huggingface.co/${entry.hfRepo}/resolve/main/${entry.hfFile}`;
     console.log(`Downloading ${entry.hfFile} (${entry.hfRepo})...`);
-    const response = await fetch(url);
-    if (!response.ok || !response.body) throw new Error(`Download failed: ${response.status} ${response.statusText}`);
-    const reader = response.body.getReader();
-    const writer = createWriteStream(modelPath);
-    const total = parseInt(response.headers.get('content-length') || '0', 10);
-    let downloaded = 0;
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      writer.write(Buffer.from(value));
-      downloaded += value.length;
-      if (total > 0) {
-        const pct = ((downloaded / total) * 100).toFixed(1);
-        process.stdout.write(`\rDownloading... ${pct}% (${(downloaded / 1024 / 1024).toFixed(1)}MB / ${(total / 1024 / 1024).toFixed(1)}MB)`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok || !response.body) throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      const total = parseInt(response.headers.get('content-length') || '0', 10);
+      let downloaded = 0;
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        downloaded += value.length;
+        if (total > 0) {
+          const pct = ((downloaded / total) * 100).toFixed(1);
+          process.stdout.write(`\rDownloading... ${pct}% (${(downloaded / 1024 / 1024).toFixed(1)}MB)`);
+        }
       }
+      
+      process.stdout.write('\n');
+      const modelData = this.concatChunks(chunks);
+      
+      await new Promise<void>((res, rej) => {
+        const writer = createWriteStream(modelPath);
+        writer.write(Buffer.from(modelData));
+        writer.end((err: Error | null) => err ? rej(err) : res());
+      });
+      
+      if (total > 50 * 1024 * 1024) {
+        console.log(`Compressing model for storage (${(total / 1024 / 1024).toFixed(1)}MB → ~${(total * 0.33 / 1024 / 1024).toFixed(1)}MB expected)...`);
+        await AutoConfig.compressModel(modelPath, compressedModelPath);
+      }
+      
+      return modelPath;
+    } finally {
+      clearTimeout(timeoutId);
     }
-    process.stdout.write('\n');
-    await new Promise<void>((res, rej) => writer.end((err: Error | null) => err ? rej(err) : res()));
-    return modelPath;
+  }
+  
+  private static concatChunks(chunks: Uint8Array[]): Uint8Array {
+    let totalLength = 0;
+    for (const chunk of chunks) totalLength += chunk.length;
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return result;
+  }
+  
+  private static async compressModel(inputPath: string, outputPath: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const readStream = createReadStream(inputPath);
+      const writeStream = createWriteStream(outputPath);
+      const gzip = createGzip();
+
+      readStream
+        .pipe(gzip)
+        .pipe(writeStream)
+        .on('finish', resolve)
+        .on('error', reject);
+    });
+  }
+
+  private static async decompressModel(inputPath: string, outputPath: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const readStream = createReadStream(inputPath);
+      const writeStream = createWriteStream(outputPath);
+      const gunzip = createGunzip();
+
+      readStream
+        .pipe(gunzip)
+        .pipe(writeStream)
+        .on('finish', resolve)
+        .on('error', reject);
+    });
   }
 
   static async autoDetectAndConfigure(): Promise<AutoModelConfig> {
@@ -196,7 +278,7 @@ export class AutoConfig {
     const cudaDevice = allDevices.find(d => d.type === 'cuda');
     const metalDevice = allDevices.find(d => d.type === 'metal');
     const webgpuDevice = allDevices.find(d => d.type === 'webgpu');
-    const vramMB = cudaDevice?.vramMB ?? (metalDevice ? hw.totalRamMB : (host.isTV ? 2048 : 0));
+    const vramMB = cudaDevice?.vramMB ?? (metalDevice ? Math.floor(hw.totalRamMB * 0.75) : (host.isTV ? 2048 : 0));
     const deviceType: 'cuda' | 'metal' | 'webgpu' | 'cpu' = cudaDevice ? 'cuda' : metalDevice ? 'metal' : webgpuDevice ? 'webgpu' : 'cpu';
     const deviceMemoryMB = vramMB || hw.freeRamMB || 2048;
     const catalogEntry = MODEL_CATALOG.slice().reverse().find(m => m.minVRAM <= deviceMemoryMB / 1024) || MODEL_CATALOG[0];
@@ -216,11 +298,13 @@ export class AutoConfig {
       const cudaRuntimeMB = 512;
       const totalReserved = kvCacheMB + scratchMB + overheadMB + cudaRuntimeMB;
       const availableForLayers = Math.max(0, ramForGPU - totalReserved);
-      const safetyFactor = 0.75;
-      const bytesPerParam = 0.5 * 1.15;
-      const modelWeightMB = catalogEntry.paramsB * 1024 * bytesPerParam;
-      const perLayerMB = modelWeightMB / modelLayers;
-      gpuLayers = Math.min(modelLayers, Math.max(0, Math.floor(availableForLayers * safetyFactor / perLayerMB)));
+      if (modelLayers === 0 || !isFinite(availableForLayers)) { gpuLayers = 0; } else {
+        const safetyFactor = 0.75;
+        const bytesPerParam = 0.5 * 1.15;
+        const modelWeightMB = (catalogEntry.paramsB || 0) * 1024 * bytesPerParam;
+        const perLayerMB = modelWeightMB / modelLayers;
+        gpuLayers = Math.min(modelLayers, Math.max(0, Math.floor(availableForLayers * safetyFactor / perLayerMB)));
+      }
     } else if (deviceType === 'metal') {
       if (modelLayers === 0) {
         gpuLayers = 0;

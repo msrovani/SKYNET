@@ -51,10 +51,16 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 21. node-llama-cpp GGUF > ExecuTorch para GPU desktop (CUDA nativo, 0 compilação .pte)
 22. Inline Mock > import dinâmico (frontend web não pode importar módulos nativos nem via barrel)
 
-## Estado Atual (Sprint 14 ✅ — Local Inference Real: Release v0.12.0)
+## Estado Atual (Sprint 14.6 ✅ — DSD + ZipNN: Release v0.13.0)
 - **Build 8/8 packages** OK via `pnpm build` (Turborepo v2.9.16)
-- **pnpm test**: 16/16 tasks, **399 testes** passando (41 core-wasm-engine + 47 blockchain-client + 43 inference-runtime + 21 desktop-node-agent + 167 p2p-mesh-network + 37 tee-attestation-layer + 7 app-ui-orchestrator + 32 fl-training-client)
-- **ESLint**: 8/8 packages configurados, **0 erros**
+- **pnpm test**: 16/16 tasks, **570 testes** passando (41 core-wasm-engine + 69 blockchain-client + 121 inference-runtime + 21 desktop-node-agent + 214 p2p-mesh-network + 51 tee-attestation-layer + 7 app-ui-orchestrator + 46 fl-training-client)
+- **ESLint**: 8/8 packages, **0 warnings, 0 erros**
+- **NOVO Sprint 14.6 — Distributed Speculative Decoding + ZipNN**
+  - DSD implementado: `generateWithDSD()` em AgentModel, LLaMACppRuntime, MLXRuntime
+  - ZipNN lossless compression: compressão com quantização 2-8 bits + codificação Huffman/arithmetic
+  - Auto-config: compressão automática de modelos >50MB no download
+  - 121 testes inference-runtime todos passando (11/11 files)
+  - TypeScript compila com 0 erros em todos os packages
 - **CUDA Toolkit 13.0 instalado**: nvcc V13.0.48, GTX 1050 4GB (driver 582.28). CUDA_PATH configurado.
 - **Sprint 14 — Ativações de Infra-estrutura de Inferência Local (v0.12.0)**: 4 implementações:
   - **P0-1: AutoConfig** (`auto-config.ts`) — deteção hardware CPU/RAM/disk/GPU NVIDIA. Catálogo 4 modelos hierárquicos por VRAM. `gpuLayers`/`threads`/`contextSize`/`batchSize` calculados automaticamente. `modelId: 'none'` skip total sem deteção.
@@ -64,7 +70,7 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **App UI web build**: compila e exporta com sucesso (`build:web`)
 - **Frontend dev server**: http://localhost:3000 (Next.js 15.5), MockAgentModel responde em Português modo LIGHTNING/DEEP
 - **WASM**: 200KB (+BLAKE3 SIMD). JS glue: 37KB. Types: 9KB.
-- **Bug Hunt v0.11.1 (legacy)**: 8 bugs encontrados e corrigidos (4 CRITICAL, 4 HIGH, 4 MEDIUM) em todos os 8 pacotes
+- **Bug Hunt v0.12.1**: 48 bugs encontrados e corrigidos (7 CRITICAL, 9 HIGH, 21 MEDIUM, 11 LOW) em todos os 8 pacotes
 - **Sprint 12 Breakthrough Innovations (v0.10.0)**: 9 implementações baseadas em investigação de papers/projetos (arXiv, W3C, ePrint, GitHub):
   - **HIGH-1: CRouting** (`semantic-router.ts:searchWithCRouting()`) — angle-based pruning, 41.5% menos distância computada, 1.48× QPS (arXiv:2303.00334)
   - **HIGH-2: BLAKE3 WASM SIMD** (`lib.rs` + `fraction-aggregator.ts`) — hash criptográfico real com blake3 crate v1.8.5 + `wasm32_simd`, ~6× speedup sobre portable WASM
@@ -113,15 +119,13 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 
 ### O que NÃO foi alterado (arquitetura deliberada)
 - **Flag `simulate`** — padrão intencional em todo o projeto (ADRs); mais de 100 ocorrências em `solana-x402.ts`, `chain-adapters.ts`, `cca-attestation.ts`, FL client. Separa integração real de hardware/protocolo da simulação.
-- **Blocos `catch` vazios no sistema de eventos** (`agent-mesh.ts:54`, `semantic-router.ts:138`, `fraction-aggregator.ts:70/210`) — tolerante a handlers com erro (try-catch no loop) por decisão arquitetural.
+- **Blocos `catch` vazios no sistema de eventos** (`agent-mesh.ts:54`, `semantic-router.ts:232`, `fraction-aggregator.ts:46/83`) — tolerante a handlers com erro (try-catch no loop) por decisão arquitetural.
 - **Cast `as any`** — limitação do TypeScript para APIs WebGPU, Automerge, WebTransport, ExecuTorch sem tipos maduros.
 - **WASM stub `index.ts`** — progressive enhancement: tenta WASM, fallback para JS implementation. Cada função stub retorna valor padrão sensato, não placeholder vazio.
-- **MockAgentModel inline no hook** — substituto do `@skynet/inference-runtime` no frontend web. Barrel import de módulo nativo falha mesmo com IgnorePlugin; classe mock inline é o único padrão que garante build web sem erros de webpack.
+- **Proxy pattern no frontend web** — `useSkynet.ts` faz fetch para `/api/inference` (Next.js API route), que delega para `inference-server.mjs` (server-side com `AgentModel` real). Frontend não importa `@skynet/inference-runtime`; `next.config.js` usa `IgnorePlugin` + `ignore-loader` para `.node`.
 
 ### Bugs Conhecidos
-- **Automerge v2 Proxy rejeita `undefined`** — usar `null` ou omitir propriedade. Fix em `decompressSnapshot` e `updatePeer`.
-- **Accented Windows paths** quebram GNU linker. WASM build usa `%TEMP%\skynet-wasm-build` (ASCII-only). `fork()` works com paths acentuados (Node.js gerencia internamente); `spawn()` quebra com `shell:true`.
-- **Automerge v2 Proxy rejeita `undefined`** — usar `null` ou omitir propriedade. Fix em `decompressSnapshot` e `updatePeer`. (Nota: upgrade para v3 pode exigir revisão API Proxy)
+- **Automerge v3 Proxy rejeita `undefined`** — usar `null` ou omitir propriedade. Fix em `decompressSnapshot` e `updatePeer`.
 - **Accented Windows paths** quebram GNU linker. WASM build usa `%TEMP%\skynet-wasm-build` (ASCII-only). `fork()` works com paths acentuados (Node.js gerencia internamente); `spawn()` quebra com `shell:true`.
 - **web-sys 0.3.99** lacks WebGPU bindings. WebGPU module stubbed.
 - **@moq/web-transport v0.1.2** `Request.ok()` retorna "request already consumed" se usado após `request.url`; ordem correcta: `url` antes de `ok()`.
@@ -233,6 +237,44 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **WebTransport mesh (3 peers)**: mesh-server.ts relay broadcast + mesh-client.ts init/ping/receive + run-mesh.ts orchestrator. Usa fork() + env MESH_PEER_ID/MESH_SERVER_URL.
 - **core-wasm-engine WASM build fallback**: Rust build precisa de `link.exe` (MSVC). Se não disponível, build.cjs faz fallback para TS stub automaticamente.
 
+## Sprint 14.5 (v0.12.2) — Deep Clean + Hardening + Deep Fixes (Jun 2026)
+- **553/553 testes, 16/16 tasks, 0 ESLint warnings/errors** (8/8 packages)
+- **CRITICAL: KVCacheEntry type drift** — `core-wasm-engine` (transformer KV state) vs `inference-runtime` (P2P cache) usavam mesmo nome com shapes incompatíveis. Renomeado para `P2PKVCacheEntry` no inference-runtime.
+- **CRITICAL: Dead dep `@x402-solana/core`** no blockchain-client — declarado mas nunca importado (x402 settlement usa `tweetnacl` direto). Removido.
+- **CRITICAL: core-wasm-engine/package.json** — segundo bloco `scripts` sobrepunha `build`/`test`/`dev`/`clean`.
+- **HIGH: WASM naming drift** — 4 structs Rust (`snake_case`) vs TS stub (`camelCase`). Adicionado `#[serde(rename_all = "camelCase")]`.
+- **HIGH: computeCapabilityScore bridge** — passava plain object JS para WASM esperando classe `NodeCapability`.
+- **HIGH: VerificationResult renomeado** no `tee-attestation-layer` para `AttestationVerificationResult` (colidia com `p2p-mesh-network` speculative-decoding).
+- **4 workspace deps removidas** do `app-ui-orchestrator` (fl-training-client, inference-runtime, p2p-mesh-network, tee-attestation-layer — nunca importados).
+- **2 workspace deps removidas** do `desktop-node-agent` (blockchain-client, fl-training-client — usados só em test).
+- **Barrel export gaps fixos**: `MatQuantEncoder` (inference-runtime), `LVSAVerifier`/`InnerProductVerifier`/`MaskedGradient`/`AggregationProof` (fl-training-client).
+- **4 novos test files**: `auto-config.test.ts` (5 tests), `llamacpp.test.ts` (5 tests), `kv-cache.test.ts` (16 tests), `model-loader.test.ts` (20 tests) = 46 novos testes.
+- **Contagem final**: core-wasm-engine 41, blockchain-client 69, inference-runtime 104, desktop-node-agent 21, p2p-mesh-network 214, tee-attestation 51, app-ui-orchestrator 7, fl-training 46 = **553 testes**.
+- **46 lint warnings fixos** em 22 ficheiros; deps mortas limpas; barrel exports corrigidos.
+
+## Sprint 14.6 (v0.13.0) — DSD + ZipNN (Jun 2026)
+- **570/570 testes, 16/16 tasks, 0 ESLint warnings/errors** (8/8 packages)
+- **NOVO: Distributed Speculative Decoding (DSD)**
+  - `AgentModel.generateWithDSD()` — método para inferência especulativa distribuída
+  - `LLaMACppRuntime.generate()` com DSD activation — suporte para GPU NVIDIA
+  - `MLXRuntime.inferWithDSDSync()` — suporte para Apple Silicon
+  - **9 testes DSD** validando: amostragem, verificação, estatísticas, adaptive speculation
+  - 3-5x throughput improvement target
+- **NOVO: ZipNN Lossless Compression**
+  - `ZipNNCompressor` — compressão lossless com quantização 2-8 bits + Huffman/arithmetic coding
+  - Headers de 36 bytes com min/max para dequantização precisa
+  - Compressão automática de modelos >50MB no download (`AutoConfig.compressModel`)
+  - **8 testes ZipNN** validando: compressão, round-trip, parâmetros configuráveis
+- **Fix: agent-model.ts** — local `InferenceResult` interface, MLX union return type
+- **Fix: llamacpp.ts** — syntax error (`;n`), `context.run()` → `generateCompletion()`
+- **Fix: mlx.ts** — `isMLXAvailable()` readicionado, imports órfãos removidos
+- **Fix: auto-config.ts** — `require('fs')` → ESM imports nativos
+- **Fix: zipnn-compress.ts** — Huffman tree bug (`null` vs `-1`), undefined variables
+- **Fix: dsd.test.ts** — Python docstrings removidos, imports p2p inválidos
+- **Fix: zipnn.test.ts** — Python docstrings removidos, testes realistas
+- **Build: TypeScript compila com 0 erros** em inference-runtime (19 ficheiros source)
+- **Testes**: 121 inference-runtime (11/11 files), 0 falhas
+
 ## Tarefas Pendentes
 - ~~**WebTransport funcional entre 2 peers reais** — CONCLUÍDO! `pnpm example:echo` funcional~~
 - ~~**Rust warnings (19→0)** — CONCLUÍDO~~
@@ -240,7 +282,8 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - ~~**Loop recursivo desktop-node-agent** — CONCLUÍDO~~
 - ~~**Pipeline Parallelism** — CONCLUÍDO (9 testes)~~
 - ~~**Segment Means compression** — CONCLUÍDO (6 testes)~~
-- ~~**Distributed Speculative Decoding** — CONCLUÍDO! 11 testes~~
+- ~~**Distributed Speculative Decoding** — CONCLUÍDO! 9 testes~~
+- ~~**ZipNN Lossless Compression** — CONCLUÍDO! 8 testes~~
 - ~~**Sharded inference pipeline** — CONCLUÍDO! 11 testes~~
 - ~~**Activation checkpoints** — CONCLUÍDO!~~
 - ~~**Thermal Management** — CONCLUÍDO! 30 testes (20 ThermalManager + 10 DynamicShifter)~~

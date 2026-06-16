@@ -152,7 +152,19 @@ export function maxModelParamsB(gpuTflops: number, vramGb: number): number {
 
 export function computeCapabilityScore(cap: any): number {
   if (wasmModule) {
-    return wasmModule.compute_capability_score(cap);
+    try {
+      const nc = new wasmModule.NodeCapability(
+        cap.gpuTflops ?? cap.gpu_tflops ?? 0,
+        cap.vramGb ?? cap.vram_gb ?? 0,
+        cap.bandwidthGbps ?? cap.bandwidth_gbps ?? 0,
+        cap.uptimePct ?? cap.uptime_pct ?? 0,
+        cap.latencyMs ?? cap.latency_ms ?? 0,
+        cap.gpuCount ?? cap.gpu_count ?? 1,
+      );
+      return wasmModule.compute_capability_score(nc);
+    } catch {
+      return computeScore(cap.gpuTflops || 0, cap.vramGb || 0, cap.uptimePct || 0, cap.latencyMs || 0);
+    }
   }
   return computeScore(cap.gpuTflops || 0, cap.vramGb || 0, cap.uptimePct || 0, cap.latencyMs || 0);
 }

@@ -3,11 +3,9 @@ import { OpportunisticRouter } from '../opportunistic-router.js';
 import { CrdtSync } from '../crdt-sync.js';
 import { FailoverManager } from '../failover.js';
 import { TransportManager } from '../transport.js';
-import { WebRTCFallback } from '../webrtc-fallback.js';
 
 function createRouter(): OpportunisticRouter {
   const transport = new TransportManager();
-  const fallback = new WebRTCFallback();
   const crdt = new CrdtSync();
   const failover = new FailoverManager(crdt, transport);
   return new OpportunisticRouter(crdt, failover);

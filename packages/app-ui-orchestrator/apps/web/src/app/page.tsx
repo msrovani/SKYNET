@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useSkynet } from '../../../../shared/hooks/useSkynet';
-import { AiMode, AgentAutonomy, AI_MODE_LABELS, AI_MODE_ICONS } from '../../../../shared/types/index';
+import { AiMode, AgentAutonomy } from '../../../../shared/types/index';
 
 const MODES: { key: AiMode; icon: string; label: string; desc: string }[] = [
   { key: AiMode.LIGHTNING, icon: '⚡', label: 'Relâmpago', desc: 'Respostas instantâneas' },

@@ -1,6 +1,5 @@
-import { ZkFlProver, hashGradientUpdate } from './zk-fl-prover.js';
-import type { ZkProof, ZkProverConfig } from './zk-fl-prover.js';
-import type { FedYogiConfig } from './fed-yogi.js';
+import { hashGradientUpdate } from './zk-fl-prover.js';
+import type { ZkProof } from './zk-fl-prover.js';
 
 export interface ZkVerifyConfig {
   trustedSetup: boolean;

@@ -14,6 +14,7 @@ export class OnnxRuntimeMobile {
     this.backend = preferredBackend ?? await this.detectBestBackend();
     try {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval -- optional native dep
         const ort = await Function('return import("onnxruntime-react-native")')() as any;
         const providers: string[] = [];
         if (this.backend === 'coreml') providers.push('coreml');
@@ -35,6 +36,7 @@ export class OnnxRuntimeMobile {
       }
     } catch (err) {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval -- optional native dep (ADR 22)
         const ort = await Function('return import("onnxruntime-web")')() as any;
         this.session = await ort.InferenceSession.create(modelPath, {
           executionProviders: ['webgpu', 'wasm', 'cpu'],

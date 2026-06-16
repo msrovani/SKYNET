@@ -88,9 +88,10 @@ export class CoreMLRuntime {
     };
 
     try {
+      let mod: any;
       try {
-        const mod = await Function('return import("coremll")')() as any;
-        this.nativeCoreML = mod.default ?? mod;
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval -- optional native dep (ADR 22)
+        mod = await Function('return import("coremll")')() as any;
       } catch (importErr) {
         const msg = importErr instanceof Error ? importErr.message : String(importErr);
         if (msg.includes('Cannot find module') || msg.includes('cannot find module') || msg.includes('Failed to resolve')) {
@@ -101,6 +102,7 @@ export class CoreMLRuntime {
         }
         throw importErr;
       }
+      this.nativeCoreML = mod.default ?? mod;
       if (this.nativeCoreML.loadModel) {
         await this.nativeCoreML.loadModel(path, {
           delegate: delegate === 'ane_and_gpu' ? 'ane_and_gpu' : delegate,

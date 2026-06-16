@@ -84,13 +84,19 @@ export class TransportManager {
     throw new Error('WebTransport not available');
   }
 
+  private readLoopPromise: Promise<void> | null = null;
+
   private setupStreamHandler(transport: any): void {
     if (transport.datagrams?.readable) {
-      this.readLoop(transport.datagrams.readable.getReader(), transport.datagrams.writable.getWriter());
+      this.readLoopPromise = this.readLoop(transport.datagrams.readable.getReader(), transport.datagrams.writable.getWriter());
+      this.readLoopPromise.catch((err) => {
+        console.warn('[SKYNET] Read loop error:', err);
+        this.state = 'degraded';
+      });
     }
   }
 
-  private async readLoop(reader: any, writer?: any): Promise<void> {
+  private async readLoop(reader: any, _writer?: any): Promise<void> {
     try {
       // eslint-disable-next-line no-constant-condition
       while (true) {
@@ -100,7 +106,11 @@ export class TransportManager {
           handler(value, 'relay');
         }
       }
-    } catch {}
+    } catch (err) {
+      console.warn('[SKYNET] Read loop crashed:', err);
+      this.state = 'degraded';
+      throw err;
+    }
   }
 
   private async tryWebRTC(): Promise<void> {

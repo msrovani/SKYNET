@@ -1,4 +1,5 @@
-import { SolanaX402, type PaymentQuote, type PaymentReceipt, type ChannelState } from './solana-x402.js';
+import { SolanaX402, type ChannelState } from './solana-x402.js';
+import { SettlementCache, UptoAuthorizer } from './x402-settlement-cache.js';
 
 export interface TxResult {
   success: boolean;
@@ -31,9 +32,13 @@ export class MicroTxManager {
   private readonly MAX_TX_HISTORY = 1000;
   private readonly MIN_INTERVAL_MS = 100;
   private lastTxTime = 0;
+  private settlementCache: SettlementCache;
+  private uptoAuthorizer: UptoAuthorizer;
 
   constructor(solana: SolanaX402) {
     this.solana = solana;
+    this.settlementCache = solana.getSettlementCache();
+    this.uptoAuthorizer = solana.getUptoAuthorizer();
   }
 
   async payForInference(inferenceId: string, costUsd: number): Promise<TxResult> {
@@ -68,7 +73,7 @@ export class MicroTxManager {
     }
   }
 
-  async payViaChannel(channelId: string, amountLamports: number, reference: string): Promise<TxResult> {
+  async payViaChannel(channelId: string, amountLamports: number, _reference: string): Promise<TxResult> {
     await this.throttle();
 
     try {
@@ -100,6 +105,59 @@ export class MicroTxManager {
       this.recordTx(result);
       return result;
     }
+  }
+
+  async payViaUptoAuthorization(channelId: string, amountLamports: number): Promise<TxResult> {
+    await this.throttle();
+    const authorized = this.uptoAuthorizer.authorize(channelId, amountLamports);
+    if (!authorized) {
+      const result: TxResult = {
+        success: false,
+        error: 'Upto authorization rejected',
+        feeUsd: 0,
+        amountUsd: 0,
+        timestamp: Date.now(),
+        status: 'failed',
+        channelId,
+      };
+      this.recordTx(result);
+      return result;
+    }
+    try {
+      const ok = await this.solana.channelPayment(channelId, amountLamports);
+      if (!ok) throw new Error('Channel payment failed');
+      const solPrice = await this.solana.getSolPrice();
+      const result: TxResult = {
+        success: true,
+        channelId,
+        feeUsd: 0,
+        amountUsd: amountLamports / 1e9 * solPrice,
+        timestamp: Date.now(),
+        status: 'confirmed',
+      };
+      this.recordTx(result);
+      return result;
+    } catch (err) {
+      const result: TxResult = {
+        success: false,
+        error: err instanceof Error ? err.message : 'Channel payment failed',
+        feeUsd: 0,
+        amountUsd: 0,
+        timestamp: Date.now(),
+        status: 'failed',
+        channelId,
+      };
+      this.recordTx(result);
+      return result;
+    }
+  }
+
+  async settleSettlementCache(channelId: string, nonce: number, amount: number): Promise<boolean> {
+    if (this.settlementCache.isDuplicate(channelId, nonce)) {
+      return false;
+    }
+    this.settlementCache.markSettled(channelId, nonce, amount);
+    return true;
   }
 
   async submitBatch(channelId: string, payments: Array<{ to: string; amountLamports: number; reference: string }>): Promise<BatchPayment> {
@@ -159,7 +217,7 @@ export class MicroTxManager {
   private async throttle(): Promise<void> {
     const elapsed = Date.now() - this.lastTxTime;
     if (elapsed < this.MIN_INTERVAL_MS) {
-      await sleep(this.MIN_INTERVAL_MS - elapsed);
+      await this.sleep(this.MIN_INTERVAL_MS - elapsed);
     }
     this.lastTxTime = Date.now();
   }
@@ -194,10 +252,18 @@ export class MicroTxManager {
   getOpenChannels(): ChannelState[] {
     return Array.from(this.openChannels.values());
   }
-}
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(r => setTimeout(r, ms));
+  getSettlementCache(): SettlementCache {
+    return this.settlementCache;
+  }
+
+  getUptoAuthorizer(): UptoAuthorizer {
+    return this.uptoAuthorizer;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(r => setTimeout(r, ms));
+  }
 }
 
 export interface TokenCommitment {

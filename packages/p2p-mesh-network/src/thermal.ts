@@ -244,6 +244,7 @@ export class ThermalManager {
     const recent = this.readings.slice(-5);
     const values = recent.map(r => r.headroom);
     const mean = values.reduce((s, v) => s + v, 0) / values.length;
+    if (mean === 0) return 1;
     const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length;
     return Math.max(0, 1 - Math.sqrt(variance) / mean);
   }

@@ -1,4 +1,4 @@
-import { SolanaX402, type PaymentReceipt } from './solana-x402.js';
+import { SolanaX402 } from './solana-x402.js';
 import { MicroTxManager, type TxResult } from './microtx.js';
 
 const LAMPORTS_PER_SOL = 1_000_000_000; // matches @solana/web3.js LAMPORTS_PER_SOL

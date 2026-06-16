@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { CircadianPeer, CircadianScore } from '../circadian-scheduler.js';
+import type { CircadianPeer } from '../circadian-scheduler.js';
 
 function makePeer(overrides: Partial<CircadianPeer> & { id: string }): CircadianPeer {
   return {

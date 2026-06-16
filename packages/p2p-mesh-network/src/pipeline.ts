@@ -161,7 +161,11 @@ export class PipelineManager {
     const remainingPeers = (this.assignment?.peers ?? []).filter(
       (p) => !this.failedPeers.has(p.peerId),
     );
-    if (remainingPeers.length === 0) return;
+    if (remainingPeers.length === 0) {
+      this.activeStages.clear();
+      return;
+    }
+    this.activeStages.clear();
     const newAssignment = this.createPartition(remainingPeers);
     this.assignment = newAssignment;
     this.emit({ type: 'pipeline-reconfigured', data: newAssignment });
@@ -183,7 +187,8 @@ export function computePeerWeight(cap: PeerCapability): number {
   const compute = cap.gpuTflops * 10;
   const memory = cap.vramGb * 5;
   const bandwidth = cap.bandwidthGbps * 3;
-  const latencyPenalty = 1 / Math.max(cap.latencyMs, 1);
+  const safeLatency = isFinite(cap.latencyMs) ? Math.max(cap.latencyMs, 1) : 1;
+  const latencyPenalty = 1 / safeLatency;
   return Math.max(1, (compute + memory + bandwidth) * latencyPenalty);
 }
 
@@ -207,7 +212,7 @@ export class MoEParallelFolding {
     };
   }
 
-  createPlan(numLayers: number, numExperts: number, peers: PeerCapability[]): Map<number, ParallelismType> {
+  createPlan(numLayers: number, numExperts: number, _peers: PeerCapability[]): Map<number, ParallelismType> {
     const plan = new Map<number, ParallelismType>();
     const layerTypes = this.config.layerTypes;
     for (let i = 0; i < numLayers; i++) {
