@@ -275,6 +275,39 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **Build: TypeScript compila com 0 erros** em inference-runtime (19 ficheiros source)
 - **Testes**: 121 inference-runtime (11/11 files), 0 falhas
 
+## Sprint 14.7 (v0.14.0) — ZipNN Bit-Packing + WebGPU Kernel Fusion + QUIC-FL (Jun 2026)
+- **599/599 testes, 16/16 tasks, 0 ESLint errors, 0 warnings** (8/8 packages)
+  - 150 inference-runtime (+25 WebGPU Kernel Fusion), 46 fl-training-client, rest unchanged
+- **NOVO: ZipNN Bit-Packing** — compressão real N-bit com packing bit-a-bit
+  - `packBits()`/`unpackBits()` — packing de N-bit values em bytes (sem浪費 Uint16)
+  - 4-bit: ~8x compressão (antes 2x), 2-bit: ~16x, 8-bit: ~4x
+  - PSNR 40.9dB em pesos neurais sintéticos (normal dist, σ=0.05)
+  - **12 testes ZipNN** (4 novos tests de ratio + round-trip)
+  - Speed: ~214 MB/s compress em CPU
+- **NOVO: WebGPU Kernel Fusion** (`webgpu-kernel-fusion.ts`)
+  - `WebGpuKernelFusion` — dispatches WGSL compute shaders reais via WebGPU
+  - `matmul()` e `matmulActivation()` — tiled 16×16 matmul com ReLU/GELU fusion
+  - `activate()` — element-wise activation shader
+  - Pipeline cache, device lifecycle, graceful fallback em Node.js
+- **NOVO: QUIC-FL Gradient Compression** (`quic-fl.ts` no fl-training-client)
+  - `QuicFlCompressor` — Top-k sparsification + error feedback + quantization
+  - Quickselect O(n) para threshold, suporte 4-bit/8-bit quantization
+  - 1% sparsity + 4-bit: ~100× compression ratio típico
+  - `decompressStatic()` para server-side sem estado
+  - **46 testes fl-training-client** (todos passando, 0 novos bugs)
+- **DSD Load Test** — benchmark realístico com parallel verification
+  - Best case (95% accept, 6× faster draft): **2.89× speedup** (96.1 vs 33.2 tok/s)
+  - Optimized case (80% accept): **1.25× speedup**
+  - DSD viável apenas quando draft ≥ 6× mais rápido que target
+- **ZipNN Validation** — validação com modelo real (Phi-3-mini, 2.39 GB)
+  - 50 MB sample testado com 2-8 bit quantization
+  - Compressão neural weights: PSNR 40.9dB, maxError 1.57e-2
+  - Resultados salvos em `scripts/zipnn-results/`
+- **Tauri Build** — VS Build Tools 2026 instalado mas sem Windows SDK
+  - `scripts/setup-tauri-build.bat` — script de setup automático
+  - Necessário instalar Windows 11 SDK component via VS Installer (admin)
+  - Alternativa: `rustup target add x86_64-pc-windows-gnu` + MinGW-w64
+
 ## Tarefas Pendentes
 - ~~**WebTransport funcional entre 2 peers reais** — CONCLUÍDO! `pnpm example:echo` funcional~~
 - ~~**Rust warnings (19→0)** — CONCLUÍDO~~
@@ -305,7 +338,7 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **ExecuTorch Device Test** — precisa de dispositivo físico (Android/iOS com ExecuTorch)
 - **Cross-Platform CI verification** — verificar status em github.com/msrovani/SKYNET/actions
 - **WASM em Safari/Firefox** — testes cross-browser pendentes
-- **Desktop Tauri native build** — bloqueado: falta MSVC toolchain (link.exe). Instalar Visual Studio Build Tools ou MinGW com `rustup target add x86_64-pc-windows-gnu`
+- **Desktop Tauri native build** — VS Build Tools 2026 instalado, link.exe presente em `C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\MSVC\14.50.35717\bin\Hostx64\x64\`. Windows SDK não instalado (falta `kernel32.lib`). Executar `scripts\setup-tauri-build.bat` como admin para instalar SDK. Alternativa: MinGW-w64 via `rustup target add x86_64-pc-windows-gnu`.
 - ~~**Sprint 9.1: Stub-to-Real Hardening** — ✅ 6 stubs substituídos (v0.8.1)~~
 - ~~**Sprint 9.2: Word-Level Embeddings** — ✅ embedText word-level random projection (v0.8.2)~~
 

@@ -52,6 +52,10 @@ export {
   type WebGpuAdapterInfo, type PreprocessResult,
 } from './webgpu-preprocess.js';
 export {
+  WebGpuKernelFusion,
+  type FusionConfig, type FusionResult,
+} from './webgpu-kernel-fusion.js';
+export {
   LMCacheP2P, DroidSpeakKVSharing, KVCompress,
   type P2PKVCacheEntry, type PeerKVCacheOffer, type RegistryTreeNode,
 } from './kv-cache.js';

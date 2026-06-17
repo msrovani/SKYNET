@@ -14,3 +14,6 @@ export {
   LVSAVerifier, InnerProductVerifier,
   type MaskedGradient, type AggregationProof,
 } from './secure-aggregation.js';
+export {
+  QuicFlCompressor, type QuicFlConfig, type QuicFlState, type CompressedGradient,
+} from './quic-fl.js';

@@ -108,4 +108,40 @@ describe('ZipNN Compression Tests', () => {
       expect(result.compressedSize).toBeLessThan(data.length * 4);
     });
   });
+
+  describe('Compression Ratio', () => {
+    it('4-bit should achieve ~8x compression ratio', async () => {
+      const data = new Float32Array(10000);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      const comp = new ZipNNCompressor({ quantBits: 4 });
+      const result = await comp.compress(data);
+      expect(result.compressionRatio).toBeGreaterThan(6);
+    });
+
+    it('2-bit should achieve ~16x compression ratio', async () => {
+      const data = new Float32Array(10000);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      const comp = new ZipNNCompressor({ quantBits: 2 });
+      const result = await comp.compress(data);
+      expect(result.compressionRatio).toBeGreaterThan(12);
+    });
+
+    it('8-bit should achieve ~4x compression ratio', async () => {
+      const data = new Float32Array(10000);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      const comp = new ZipNNCompressor({ quantBits: 8 });
+      const result = await comp.compress(data);
+      expect(result.compressionRatio).toBeGreaterThan(3);
+    });
+
+    it('compression ratio varies inversely with quantBits', async () => {
+      const data = new Float32Array(10000);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      const r2 = (await new ZipNNCompressor({ quantBits: 2 }).compress(data)).compressionRatio;
+      const r4 = (await new ZipNNCompressor({ quantBits: 4 }).compress(data)).compressionRatio;
+      const r8 = (await new ZipNNCompressor({ quantBits: 8 }).compress(data)).compressionRatio;
+      expect(r2).toBeGreaterThan(r4);
+      expect(r4).toBeGreaterThan(r8);
+    });
+  });
 });

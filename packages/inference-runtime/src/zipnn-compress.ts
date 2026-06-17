@@ -21,6 +21,42 @@ export interface ZipNNMetadata {
   originalDtype: string;
 }
 
+function packBits(values: number[], bitsPerValue: number): Uint8Array {
+  const totalBits = values.length * bitsPerValue;
+  const byteLen = Math.ceil(totalBits / 8);
+  const packed = new Uint8Array(byteLen);
+  let bitPos = 0;
+  for (const v of values) {
+    for (let b = 0; b < bitsPerValue; b++) {
+      if (v & (1 << b)) {
+        const byteIdx = Math.floor(bitPos / 8);
+        const bitIdx = bitPos % 8;
+        packed[byteIdx] |= (1 << bitIdx);
+      }
+      bitPos++;
+    }
+  }
+  return packed;
+}
+
+function unpackBits(packed: Uint8Array, numValues: number, bitsPerValue: number): number[] {
+  const values: number[] = [];
+  let bitPos = 0;
+  for (let i = 0; i < numValues; i++) {
+    let v = 0;
+    for (let b = 0; b < bitsPerValue; b++) {
+      const byteIdx = Math.floor(bitPos / 8);
+      const bitIdx = bitPos % 8;
+      if (packed[byteIdx] & (1 << bitIdx)) {
+        v |= (1 << b);
+      }
+      bitPos++;
+    }
+    values.push(v);
+  }
+  return values;
+}
+
 export class ZipNNCompressor {
   config: ZipNNConfig;
 
@@ -38,7 +74,7 @@ export class ZipNNCompressor {
     const quantizer = new Quantizer(this.config.quantBits);
     const quantized = quantizer.quantize(data);
 
-    const encoder = new EntropyEncoder(this.config.entropyCoder);
+    const encoder = new EntropyEncoder(this.config.quantBits);
     const encoded = encoder.encode(quantized);
 
     const minValue = Math.min(...data);
@@ -83,8 +119,7 @@ export class ZipNNCompressor {
     const maxValue = headerSize >= 36 ? view.getFloat32(32, true) : 1;
 
     const body = compressedData.slice(headerSize);
-    const coder = metadata.entropyCoder === 'arithmetic' ? 'arithmetic' : 'huffman';
-    const decoder = new EntropyDecoder(coder);
+    const decoder = new EntropyDecoder();
     const quantized = decoder.decode(body);
 
     const dequantizer = new Dequantizer(metadata.quantBits, minValue, maxValue);
@@ -148,39 +183,33 @@ class Dequantizer {
 }
 
 class EntropyEncoder {
-  private coder: 'huffman' | 'arithmetic';
+  private bitsPerValue: number;
 
-  constructor(coder: 'huffman' | 'arithmetic') {
-    this.coder = coder;
+  constructor(bitsPerValue: number) {
+    this.bitsPerValue = bitsPerValue;
   }
 
   encode(data: Uint32Array): Uint8Array {
-    const bytesPerValue = 2;
-    const result = new Uint8Array(data.length * bytesPerValue + 8);
-    const view = new DataView(result.buffer);
+    const values = Array.from(data);
+    const packed = packBits(values, this.bitsPerValue);
+    const header = new Uint8Array(8);
+    const view = new DataView(header.buffer);
     view.setUint32(0, data.length, true);
-    view.setUint32(4, this.coder === 'huffman' ? 0 : 1, true);
-    for (let i = 0; i < data.length; i++) {
-      view.setUint16(8 + i * bytesPerValue, data[i], true);
-    }
-    return result.slice(0, 8 + data.length * bytesPerValue);
+    view.setUint32(4, this.bitsPerValue, true);
+    const result = new Uint8Array(8 + packed.length);
+    result.set(header, 0);
+    result.set(packed, 8);
+    return result;
   }
 }
 
 class EntropyDecoder {
-  private coder: 'huffman' | 'arithmetic';
-
-  constructor(coder: 'huffman' | 'arithmetic') {
-    this.coder = coder;
-  }
-
   decode(data: Uint8Array): Uint32Array {
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     const length = view.getUint32(0, true);
-    const result = new Uint32Array(length);
-    for (let i = 0; i < length; i++) {
-      result[i] = view.getUint16(8 + i * 2, true);
-    }
-    return result;
+    const bitsPerValue = view.getUint32(4, true);
+    const packed = data.slice(8);
+    const values = unpackBits(packed, length, bitsPerValue);
+    return new Uint32Array(values);
   }
 }

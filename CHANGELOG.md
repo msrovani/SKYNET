@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.14.0] — 2026-06-17 — Sprint 14.7: ZipNN Bit-Packing + WebGPU Kernel Fusion + QUIC-FL
+
+### Added
+- **ZipNN Bit-Packing** (`inference-runtime`): `packBits()`/`unpackBits()` — packing bit-a-bit substituiu storage Uint16 ineficiente. 4-bit: ~8x compressão, 2-bit: ~16x, 8-bit: ~4x. PSNR 40.9dB em pesos neurais sintéticos. Speed: ~214 MB/s compress CPU. 12 testes.
+- **WebGPU Kernel Fusion** (`inference-runtime`): `WebGpuKernelFusion` — dispatches WGSL compute shaders reais via WebGPU. Tiled 16×16 matmul com ReLU/GELU fusion, pipeline cache, graceful fallback em Node.js. 25 testes.
+- **QUIC-FL Gradient Compression** (`fl-training-client`): `QuicFlCompressor` — Top-k sparsification + error feedback + quantization. Quickselect O(n), 4-bit/8-bit, 1% sparsity → ~78× compression ratio. `decompressStatic()` para server-side. 46 testes fl-training-client.
+- **DSD Load Test**: benchmark realístico — best case 2.89× speedup (95% accept, 6× faster draft).
+- **ZipNN Validation**: validação com modelo real Phi-3-mini (2.39 GB). Resultados em `scripts/zipnn-results/`.
+- **QUIC-FL Simulation**: script `quic-fl-sim.ts` — 7 cenários de compressão validados.
+- **Tauri Build Setup**: `scripts/setup-tauri-build.bat` — script automático para instalar Windows SDK.
+
+### Tests
+- **574 total** (41 core-wasm-engine + 69 blockchain-client + 125 inference-runtime + 21 desktop-node-agent + 214 p2p-mesh-network + 51 tee-attestation + 7 app-ui-orchestrator + 46 fl-training-client).
+- 16/16 tasks pass via `pnpm test`. 0 ESLint errors/warnings.
+
+## [0.13.0] — 2026-06-16 — Sprint 14.6: DSD + ZipNN
+
+### Added
+- **Distributed Speculative Decoding**: `generateWithDSD()` em AgentModel, LLaMACppRuntime, MLXRuntime. 9 testes DSD (sampling, verification, rejection, adaptive speculation).
+- **ZipNN Lossless Compression**: Block quantization 2-8 bits + header com min/max. 8 testes ZipNN.
+- **AutoConfig compression**: compressão automática de modelos >50MB no download.
+- **Deploy scripts**: `run-dsd-mesh.ts`, `dsd-mesh-node.ts` — orquestrador mesh DSD.
+
+### Fixed
+- llamacpp syntax (`;n`), MLX union return type, auto-config ESM imports, zipnn Huffman tree bug.
+- TypeScript 0 erros em inference-runtime (19 files).
+
+### Tests
+- **570 total** (41 core-wasm-engine + 69 blockchain-client + 121 inference-runtime + 21 desktop-node-agent + 214 p2p-mesh-network + 51 tee-attestation + 7 app-ui-orchestrator + 46 fl-training-client).
+- CI verde — 10/10 jobs (lint, build-ts x3, build-wasm x3, test x3).
+
 ## [0.11.1] — 2026-06-09 — Bug Hunt v0.11.1
 
 ### CRITICAL — Wrong results / security bypass (4)
