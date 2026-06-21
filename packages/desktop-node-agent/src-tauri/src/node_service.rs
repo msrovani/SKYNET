@@ -102,10 +102,12 @@ async fn restart_node() {
 
 // ─── Stats ────────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub fn increment_tasks(n: u64) {
     TASKS_COMPLETED.fetch_add(n, Ordering::Relaxed);
 }
 
+#[allow(dead_code)]
 pub fn increment_tokens(n: u64) {
     TOKENS_PROCESSED.fetch_add(n, Ordering::Relaxed);
 }

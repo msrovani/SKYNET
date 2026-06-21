@@ -51,10 +51,16 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 21. node-llama-cpp GGUF > ExecuTorch para GPU desktop (CUDA nativo, 0 compilação .pte)
 22. Inline Mock > import dinâmico (frontend web não pode importar módulos nativos nem via barrel)
 
-## Estado Atual (Sprint 14.8 ✅ — Bug Hunt 9 Categorias: Release v0.14.1)
+## Estado Atual (Sprint 15 🚧 — Tauri Build + TEE Bridge + CI Hardening)
 - **Build 8/8 packages** OK via `pnpm build` (Turborepo v2.9.16)
 - **pnpm test**: 16/16 tasks, **642 testes** passando (41 core-wasm-engine + 69 blockchain-client + 157 inference-runtime + 27 desktop-node-agent + 243 p2p-mesh-network + 51 tee-attestation-layer + 7 app-ui-orchestrator + 47 fl-training-client)
 - **ESLint**: 8/8 packages, **0 warnings, 0 erros**
+- **NOVO Sprint 15 — Tauri Build + TEE Bridge + CI Hardening (v0.15.0)**
+  - **Tauri native build**: `cargo check` passed from ASCII-only `C:\TauriBuild\src-tauri` with MinGW GNU toolchain — **0 warnings** (6 warnings fixos: `#[allow(dead_code)]` em `PowerProfile`, `increment_tasks`/`increment_tokens`; dead `HashMap`/`Arc`/`Instant` imports removidos)
+  - **Tauri Icons created**: `src-tauri/icons/` with 32x32.png, 128x128.png, icon.ico, icon.icns, icon.png
+  - **DStack TEE real integration**: `dstack-container.ts` reescrito com `@phala/dstack-sdk@^0.5.8`. `isAvailable()` check por socket/env, `createClient()` factory, `getQuote()`/`getKey()`/`attest()` com fallback simulado. Web Crypto SHA-256 em vez de DJB2. **51/51 testes passam**
+  - **Build fix**: accented path `Área de Trabalho` quebra MinGW linker. Solução: `CARGO_TARGET_DIR=C:\TauriBuild\target` + `robocopy` para `C:\TauriBuild\src-tauri` (ASCII puro)
+  - **Blocked**: `wasm32-unknown-unknown` target não instalado — WASM build cai para TS stub (pré-existente)
 - **NOVO Sprint 14.8 — Bug Hunt 9 Categorias (v0.14.1)**
   - **57 bugs corrigidos** em 8 packages: 15 Types + 10 Runtime + 14 Race conditions + 9 Memory/Resource + 10 Edge cases + 26 barrel exports + 7 Test isolation
   - **CRITICAL**: `1 << quantBits` overflow (≥32 bits) → lookup table `MAX_QUANT_LOOKUP` em zipnn-compress, quic-fl

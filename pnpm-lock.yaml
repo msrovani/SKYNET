@@ -142,13 +142,6 @@ importers:
         version: 1.6.1(@types/node@25.9.2)(terser@5.48.0)
 
   packages/fl-training-client:
-    dependencies:
-      '@skynet/blockchain-client':
-        specifier: workspace:*
-        version: link:../blockchain-client
-      '@skynet/p2p-mesh-network':
-        specifier: workspace:*
-        version: link:../p2p-mesh-network
     devDependencies:
       eslint:
         specifier: ^8.57.0
@@ -215,6 +208,13 @@ importers:
         version: 1.6.1(@types/node@25.9.2)(terser@5.48.0)
 
   packages/tee-attestation-layer:
+    dependencies:
+      '@noble/hashes':
+        specifier: ^1.8.0
+        version: 1.8.0
+      '@phala/dstack-sdk':
+        specifier: ^0.5.8
+        version: 0.5.8(@noble/curves@1.9.7)(@noble/hashes@1.8.0)(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))
     devDependencies:
       eslint:
         specifier: ^8.57.0
@@ -988,6 +988,22 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@phala/dstack-sdk@0.5.8':
+    resolution: {integrity: sha512-VANlyo0Jj6pxmJl3zksHJ4/5y3VflApVmgsfcfmokk3KYKRBkW5oMkexBTR6lZaGVPOqJ48QGOLP/7CF3IEvFg==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@noble/curves': ^1.8.1
+      '@noble/hashes': ^1.6.1
+      '@solana/web3.js': ^1.98.4
+      viem: ^2.43.3
+    peerDependenciesMeta:
+      '@noble/curves':
+        optional: true
+      '@solana/web3.js':
+        optional: true
+      viem:
+        optional: true
 
   '@react-native/assets-registry@0.86.0':
     resolution: {integrity: sha512-nIaXbm2jX1OTYp0qbviJ3O6KZivoE8z3BnhUQ2LsqfZSWRoOK/n1qsiAr6oALiNKWnXY3j2KPwtYORnZzp8xew==}
@@ -3887,6 +3903,13 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
+
+  '@phala/dstack-sdk@0.5.8(@noble/curves@1.9.7)(@noble/hashes@1.8.0)(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))':
+    dependencies:
+      '@noble/hashes': 1.8.0
+    optionalDependencies:
+      '@noble/curves': 1.9.7
+      '@solana/web3.js': 1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
 
   '@react-native/assets-registry@0.86.0':
     optional: true

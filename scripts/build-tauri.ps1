@@ -7,8 +7,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Paths
-$srcTauri = "C:\Users\msrov\OneDrive\Área de Trabalho\SKYNET\packages\desktop-node-agent\src-tauri"
+# Paths — use Get-ChildItem with provider to handle accented paths
+$srcRoot = "C:\Users\msrov\OneDrive\Área de Trabalho\SKYNET"
+$srcTauri = "$srcRoot\packages\desktop-node-agent\src-tauri"
 $buildDir = "C:\TauriBuild\src-tauri"
 $publicDir = "C:\TauriBuild\public"
 $iconsDir = "C:\TauriBuild\icons"
@@ -88,14 +89,20 @@ if (!(Test-Path "$iconsDir\icon.ico")) {
     $writer.Dispose(); $icoStream.Dispose()
 }
 
-# Sync src-tauri to build directory (copy new files, skip existing target)
-if (Test-Path $buildDir) {
-    # Only update source files, not target/
-    Copy-Item "$srcTauri\*" $buildDir -Recurse -Force -Exclude "target"
-    Copy-Item "$srcTauri\.cargo\*" "$buildDir\.cargo" -Recurse -Force -ErrorAction SilentlyContinue
-} else {
-    Copy-Item $srcTauri $buildDir -Recurse -Force
-    Remove-Item "$buildDir\target" -Recurse -Force -ErrorAction SilentlyContinue
+# Sync src-tauri to build directory using robocopy (handles accented paths)
+# robocopy exit codes: 0-7 = success, 8+ = error
+if (!(Test-Path $buildDir)) {
+    New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
+}
+$rc = robocopy $srcTauri $buildDir /E /XD target /NP /NFL /NDL /NJH /NJS
+if ($LASTEXITCODE -ge 8) { throw "robocopy failed with exit code $LASTEXITCODE" }
+
+# Sync .cargo config
+$cargoSrc = "$srcTauri\.cargo"
+if (Test-Path $cargoSrc) {
+    if (!(Test-Path $cargoConfigDir)) { New-Item -ItemType Directory -Path $cargoConfigDir -Force | Out-Null }
+    $rc = robocopy $cargoSrc $cargoConfigDir /E /NP /NFL /NDL /NJH /NJS
+    if ($LASTEXITCODE -ge 8) { throw "robocopy .cargo failed with exit code $LASTEXITCODE" }
 }
 
 # Fix tauri.conf.json BOM issue

@@ -29,7 +29,7 @@ export {
 } from './cca-attestation.js';
 
 export {
-  DStackContainer, type DStackConfig, type DStackAttestation,
+  DStackContainer, type DStackConfig, type DStackAttestation, type DStackQuoteResponse, type DStackKeyResponse,
 } from './dstack-container.js';
 
 export {

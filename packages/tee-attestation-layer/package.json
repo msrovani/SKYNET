@@ -18,10 +18,13 @@
     "test": "vitest run --passWithNoTests",
     "lint": "eslint src/ --ext .ts"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@noble/hashes": "^1.8.0",
+    "@phala/dstack-sdk": "^0.5.8"
+  },
   "devDependencies": {
+    "eslint": "^8.57.0",
     "typescript": "^5.4.0",
-    "vitest": "^1.6.0",
-    "eslint": "^8.57.0"
+    "vitest": "^1.6.0"
   }
 }

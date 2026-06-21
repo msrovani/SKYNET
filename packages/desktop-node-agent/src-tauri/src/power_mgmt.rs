@@ -9,6 +9,7 @@ pub struct IdleState {
     pub power_plan: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub enum PowerProfile {
     Balanced,   // Default: max performance when idle
