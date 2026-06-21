@@ -147,3 +147,81 @@ describe('KVCompress', () => {
     expect(metadata[0]).toBe(1);
   });
 });
+
+describe('KVCacheQuantizer', () => {
+  let KVCacheQuantizer: any;
+
+  beforeEach(async () => {
+    const mod = await import('../kv-cache.js');
+    KVCacheQuantizer = mod.KVCacheQuantizer;
+  });
+
+  it('quantizes and dequantizes 4-bit preserving approximate values', () => {
+    const quantizer = new KVCacheQuantizer({ bitWidth: 4, groupSize: 64, useHadamard: false });
+    const input = new Float32Array([0.5, -0.3, 0.8, -0.1, 0.0, 0.9, -0.7, 0.2]);
+    const quantized = quantizer.quantizeKV(input, input);
+    const { keys } = quantizer.dequantizeKV(quantized);
+    for (let i = 0; i < input.length; i++) {
+      const err = Math.abs(keys[i] - input[i]);
+      expect(err).toBeLessThan(0.2);
+    }
+    expect(quantized.bitWidth).toBe(4);
+  });
+
+  it('quantizes and dequantizes 2-bit with reasonable fidelity', () => {
+    const quantizer = new KVCacheQuantizer({ bitWidth: 2, groupSize: 32, useHadamard: false });
+    const input = new Float32Array(32).fill(0).map(() => Math.random() * 2 - 1);
+    const quantized = quantizer.quantizeKV(input, input);
+    const { keys } = quantizer.dequantizeKV(quantized);
+    let mse = 0;
+    for (let i = 0; i < input.length; i++) mse += (keys[i] - input[i]) ** 2;
+    mse /= input.length;
+    expect(mse).toBeLessThan(0.5);
+  });
+
+  it('uses Hadamard transform when enabled', () => {
+    const withHadamard = new KVCacheQuantizer({ bitWidth: 4, groupSize: 64, useHadamard: true });
+    const withoutHadamard = new KVCacheQuantizer({ bitWidth: 4, groupSize: 64, useHadamard: false });
+    const input = new Float32Array([1.0, -0.5, 0.3, -0.8, 0.2, 0.7, -0.1, -0.4]);
+    const q1 = withHadamard.quantizeKV(input, input);
+    const q2 = withoutHadamard.quantizeKV(input, input);
+    expect(q1.scaleK.length).toBe(q2.scaleK.length);
+    const { keys: k1 } = withHadamard.dequantizeKV(q1);
+    const { keys: k2 } = withoutHadamard.dequantizeKV(q2);
+    let err1 = 0; let err2 = 0;
+    for (let i = 0; i < input.length; i++) {
+      err1 += Math.abs(k1[i] - input[i]);
+      err2 += Math.abs(k2[i] - input[i]);
+    }
+    expect(err1).toBeLessThanOrEqual(err2 * 1.5);
+  });
+
+  it('compression ratio decreases with bit width', () => {
+    const q4 = new KVCacheQuantizer({ bitWidth: 4, groupSize: 64 });
+    const q2 = new KVCacheQuantizer({ bitWidth: 2, groupSize: 64 });
+    expect(q4.compressionRatio(4)).toBe(8);
+    expect(q2.compressionRatio(2)).toBe(16);
+  });
+
+  it('estimates memory usage correctly', () => {
+    const quantizer = new KVCacheQuantizer({ bitWidth: 4, groupSize: 64 });
+    const estimate = quantizer.estimateMemoryUsage(1024, 1);
+    expect(estimate.fp32Bytes).toBe(8192);
+    expect(estimate.quantizedBytes).toBeLessThan(estimate.fp32Bytes);
+    expect(estimate.ratio).toBeGreaterThan(1);
+  });
+
+  it('handles empty input gracefully', () => {
+    const quantizer = new KVCacheQuantizer({ bitWidth: 4, groupSize: 64 });
+    const input = new Float32Array(0);
+    const quantized = quantizer.quantizeKV(input, input);
+    expect(quantized.scaleK.length).toBe(0);
+  });
+
+  it('setConfig updates quantization parameters', () => {
+    const quantizer = new KVCacheQuantizer({ bitWidth: 4 });
+    expect(quantizer.getConfig().bitWidth).toBe(4);
+    quantizer.setConfig({ bitWidth: 2 });
+    expect(quantizer.getConfig().bitWidth).toBe(2);
+  });
+});

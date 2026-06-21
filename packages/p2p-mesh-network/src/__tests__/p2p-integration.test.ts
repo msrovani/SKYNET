@@ -19,6 +19,9 @@ describe('TransportManager', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useFakeTimers();
+    vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   it('starts in disconnected state', async () => {
@@ -67,6 +70,9 @@ describe('WebRTCFallback', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useFakeTimers();
+    vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   it('creates a DataChannel on connect', async () => {
@@ -165,6 +171,9 @@ describe('RoleElection', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useFakeTimers();
+    vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   it('derives L3 role for datacenter capability', async () => {

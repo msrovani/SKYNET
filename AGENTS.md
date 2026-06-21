@@ -51,11 +51,17 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 21. node-llama-cpp GGUF > ExecuTorch para GPU desktop (CUDA nativo, 0 compilação .pte)
 22. Inline Mock > import dinâmico (frontend web não pode importar módulos nativos nem via barrel)
 
-## Estado Atual (Sprint 14.6 ✅ — DSD + ZipNN: Release v0.13.0)
+## Estado Atual (Sprint 14.8 ✅ — Bug Hunt 9 Categorias: Release v0.14.1)
 - **Build 8/8 packages** OK via `pnpm build` (Turborepo v2.9.16)
-- **pnpm test**: 16/16 tasks, **570 testes** passando (41 core-wasm-engine + 69 blockchain-client + 121 inference-runtime + 21 desktop-node-agent + 214 p2p-mesh-network + 51 tee-attestation-layer + 7 app-ui-orchestrator + 46 fl-training-client)
+- **pnpm test**: 16/16 tasks, **642 testes** passando (41 core-wasm-engine + 69 blockchain-client + 157 inference-runtime + 27 desktop-node-agent + 243 p2p-mesh-network + 51 tee-attestation-layer + 7 app-ui-orchestrator + 47 fl-training-client)
 - **ESLint**: 8/8 packages, **0 warnings, 0 erros**
-- **NOVO Sprint 14.6 — Distributed Speculative Decoding + ZipNN**
+- **NOVO Sprint 14.8 — Bug Hunt 9 Categorias (v0.14.1)**
+  - **57 bugs corrigidos** em 8 packages: 15 Types + 10 Runtime + 14 Race conditions + 9 Memory/Resource + 10 Edge cases + 26 barrel exports + 7 Test isolation
+  - **CRITICAL**: `1 << quantBits` overflow (≥32 bits) → lookup table `MAX_QUANT_LOOKUP` em zipnn-compress, quic-fl
+  - **HIGH**: `parseInt` sem radix (4x), `Math.round` SOL→lamports, nibble order stub vs Rust invertido, OOB write em encodeInt4/extractInt2 flat indexing
+  - **Dead code**: `getHardwareBackends`, `NestedPrecision` removidos; 2 deps removidas de fl-training-client
+  - **642 testes** (157 inference-runtime + 47 fl-training-client + 69 blockchain-client + 41 core-wasm-engine + 27 desktop-node-agent + 243 p2p-mesh-network + 51 tee-attestation + 7 app-ui-orchestrator)
+  - **16/16 tasks, 0 ESLint errors/warnings** (8/8 packages)
   - DSD implementado: `generateWithDSD()` em AgentModel, LLaMACppRuntime, MLXRuntime
   - ZipNN lossless compression: compressão com quantização 2-8 bits + codificação Huffman/arithmetic
   - Auto-config: compressão automática de modelos >50MB no download
@@ -304,9 +310,23 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
   - Compressão neural weights: PSNR 40.9dB, maxError 1.57e-2
   - Resultados salvos em `scripts/zipnn-results/`
 - **Tauri Build** — VS Build Tools 2026 instalado mas sem Windows SDK
-  - `scripts/setup-tauri-build.bat` — script de setup automático
-  - Necessário instalar Windows 11 SDK component via VS Installer (admin)
+  - MinGW-w64 (w64devkit v2.8.0) em `C:\tools\w64devkit` + Rust toolchain `stable-x86_64-pc-windows-gnu` default
+  - Cargo config: linker=`x86_64-w64-mingw32-gcc`, target=`x86_64-pc-windows-gnu`
+  - `scripts/build-tauri.ps1` — sincroniza para `C:\TauriBuild` (ASCII puro) e executa cargo check/build/release
+  - Necessário build de `C:\TauriBuild` (MinGW ld não lida com paths acentuados)
   - Alternativa: `rustup target add x86_64-pc-windows-gnu` + MinGW-w64
+
+- ~~**Bug Hunt v0.14.1 — 9 Categorias** — CONCLUÍDO! 57 bugs corrigidos, 642 testes, 0 lint~~
+  - ~~**Categoria 1 — Types (15 bugs)**~~
+  - ~~**Categoria 2 — Runtime (10 bugs)**~~
+  - ~~**Categoria 3 — Race conditions (14 bugs)**~~
+  - ~~**Categoria 4 — Memory/Resource (9 bugs)**~~
+  - ~~**Categoria 5 — Edge cases (10 bugs)**~~
+  - ~~**Categoria 6 — API drift (26 barrel exports)**~~
+  - ~~**Categoria 7 — Test isolation (7 fixes)**~~
+  - ~~**Categoria 8 — Error swallowing (0 bugs)**~~
+  - ~~**Categoria 9 — Dead code (6 removals)**~~
+  - ~~**Categoria 10 — Numeric precision (5 bugs)**~~
 
 ## Tarefas Pendentes
 - ~~**WebTransport funcional entre 2 peers reais** — CONCLUÍDO! `pnpm example:echo` funcional~~
@@ -338,7 +358,11 @@ DePIN super app para inferência de IA distribuída. Agrega computação ociosa 
 - **ExecuTorch Device Test** — precisa de dispositivo físico (Android/iOS com ExecuTorch)
 - **Cross-Platform CI verification** — verificar status em github.com/msrovani/SKYNET/actions
 - **WASM em Safari/Firefox** — testes cross-browser pendentes
-- **Desktop Tauri native build** — VS Build Tools 2026 instalado, link.exe presente em `C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\MSVC\14.50.35717\bin\Hostx64\x64\`. Windows SDK não instalado (falta `kernel32.lib`). Executar `scripts\setup-tauri-build.bat` como admin para instalar SDK. Alternativa: MinGW-w64 via `rustup target add x86_64-pc-windows-gnu`.
+- **Desktop Tauri native build** — ✅ MinGW-w64 + Rust GNU toolchain via `scripts/build-tauri.ps1`
+  - `C:\tools\w64devkit` (w64devkit v2.8.0, GCC 16.1.0)
+  - Rust default: `stable-x86_64-pc-windows-gnu`
+  - Build feito em `C:\TauriBuild` (ASCII puro, sem acentos)
+  - `cargo check` passa com 0 erros (6 warnings não críticos)
 - ~~**Sprint 9.1: Stub-to-Real Hardening** — ✅ 6 stubs substituídos (v0.8.1)~~
 - ~~**Sprint 9.2: Word-Level Embeddings** — ✅ embedText word-level random projection (v0.8.2)~~
 

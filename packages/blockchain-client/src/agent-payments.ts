@@ -64,7 +64,7 @@ export class AgentX402Payments {
     const solPrice = await this.x402.getSolPrice();
     const freq = await this.estimateFrequency(quote.agentId);
     if (freq >= this.CHANNEL_COST_THRESHOLD) {
-      return this.payViaChannel(quote, _userWallet);
+      return this.payViaChannel(quote, solPrice, _userWallet);
     }
     return this.microtx.payForInference(quote.taskId, quote.estimatedCost / LAMPORTS_PER_SOL * solPrice);
   }
@@ -89,13 +89,26 @@ export class AgentX402Payments {
     return channel;
   }
 
-  async payViaChannel(quote: AgentPaymentQuote, _userWallet: string): Promise<TxResult> {
+  private creatingChannels = new Set<string>();
+
+  async payViaChannel(quote: AgentPaymentQuote, solPrice: number, _userWallet: string): Promise<TxResult> {
     const merchantWallet = this.config.merchantWallet;
     let channel = Array.from(this.channels.values())
       .find(c => c.merchantWallet === merchantWallet && c.status === 'open');
 
+    if (!channel && !this.creatingChannels.has(merchantWallet)) {
+      this.creatingChannels.add(merchantWallet);
+      try {
+        channel = await this.openChannel(merchantWallet, quote.estimatedCost * 10);
+      } finally {
+        this.creatingChannels.delete(merchantWallet);
+      }
+    }
+
     if (!channel) {
-      channel = await this.openChannel(merchantWallet, quote.estimatedCost * 10);
+      channel = Array.from(this.channels.values())
+        .find(c => c.merchantWallet === merchantWallet && c.status === 'open');
+      if (!channel) throw new Error('Failed to create or find payment channel');
     }
 
     if (channel.remainingBalance < quote.estimatedCost) {
@@ -111,7 +124,7 @@ export class AgentX402Payments {
       success: true,
       txHash: `channel:${channel.channelId}:nonce:${channel.nonce}`,
       feeUsd: 0,
-      amountUsd: quote.estimatedCost / LAMPORTS_PER_SOL,
+      amountUsd: (quote.estimatedCost / LAMPORTS_PER_SOL) * solPrice,
       timestamp: Date.now(),
       channelId: channel.channelId,
       status: 'confirmed',

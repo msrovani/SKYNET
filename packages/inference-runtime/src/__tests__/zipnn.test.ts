@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ZipNNCompressor } from '../zipnn-compress.js';
+import type { QuantBitWidth } from '../zipnn-compress.js';
 
 describe('ZipNN Compression Tests', () => {
   let compressor: ZipNNCompressor;
@@ -90,7 +91,7 @@ describe('ZipNN Compression Tests', () => {
     it('should accept different quantBits values', async () => {
       const data = new Float32Array(500);
       for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-      const configs = [2, 4, 8];
+      const configs: QuantBitWidth[] = [2, 4, 8];
       for (const bits of configs) {
         const customCompressor = new ZipNNCompressor({ quantBits: bits });
         const result = await customCompressor.compress(data);

@@ -1,5 +1,7 @@
+export type Probability = number; // constrained to [0, 1] at runtime
+
 export interface QuicFlConfig {
-  sparsity: number;
+  sparsity: Probability;
   quantBits: number;
   errorFeedback: boolean;
   quantize: boolean;
@@ -29,7 +31,7 @@ export class QuicFlCompressor {
   constructor(config: Partial<QuicFlConfig> = {}) {
     this.config = {
       sparsity: config.sparsity ?? 0.01,
-      quantBits: config.quantBits ?? 4,
+      quantBits: Math.max(1, config.quantBits ?? 4),
       errorFeedback: config.errorFeedback ?? true,
       quantize: config.quantize ?? true,
     };
@@ -103,7 +105,7 @@ export class QuicFlCompressor {
         if (selectedValues[i] > maxVal) maxVal = selectedValues[i];
       }
       const range = maxVal - minVal;
-      const quantMax = (1 << this.config.quantBits) - 1;
+      const quantMax = ({ 2: 3, 4: 15, 8: 255 } as Record<number, number>)[this.config.quantBits] ?? 255;
 
       offset = minVal;
       scale = range / quantMax;
@@ -202,7 +204,7 @@ export class QuicFlCompressor {
       const idx = compressed.indices[i];
       if (isQuantized) {
         const qVal = compressed.values[i] as number;
-        const unsigned = compressed.offset !== undefined ? qVal : (compressed.scale !== undefined && compressed.scale > 1e-10 ? qVal + half : qVal);
+        const unsigned = compressed.offset !== undefined ? qVal + half : (compressed.scale !== undefined && compressed.scale > 1e-10 ? qVal + half : qVal);
         if (compressed.offset !== undefined && compressed.scale !== undefined) {
           result[idx] = unsigned * compressed.scale + compressed.offset;
         } else if (compressed.scale !== undefined) {
@@ -275,7 +277,7 @@ export class QuicFlCompressor {
       if (isQuantized) {
         const qVal = values[i] as number;
         if (offset !== undefined) {
-          const unsigned = qVal < 0 ? qVal + half : qVal;
+          const unsigned = qVal + half;
           result[idx] = unsigned * scale + offset;
         } else {
           const unsigned = qVal + half;

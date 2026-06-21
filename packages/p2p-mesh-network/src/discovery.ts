@@ -51,8 +51,9 @@ export class PeerDiscovery {
           }
         } catch { /* skip malformed */ }
       };
-      ws.onerror = () => { clearTimeout(timeout); reject(new Error('Signalling connection failed')); };
-      ws.onclose = () => { clearTimeout(timeout); resolve(); };
+      let settled = false;
+      ws.onerror = () => { if (!settled) { settled = true; clearTimeout(timeout); reject(new Error('Signalling connection failed')); } };
+      ws.onclose = () => { if (!settled) { settled = true; clearTimeout(timeout); resolve(); } };
     });
     for (const peer of discovered) {
       this.discoveredPeers.set(peer.id, peer);

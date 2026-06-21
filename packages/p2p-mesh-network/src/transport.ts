@@ -62,6 +62,7 @@ export class TransportManager {
   }
 
   async connect(): Promise<void> {
+    if (this.state === 'connecting' || this.state === 'connected') return;
     this.state = 'connecting';
     try {
       await this.tryWebTransport();
@@ -85,10 +86,21 @@ export class TransportManager {
   }
 
   private readLoopPromise: Promise<void> | null = null;
+  private reader: any = null;
 
   private setupStreamHandler(transport: any): void {
+    if (this.reader) {
+      try { this.reader.cancel(); } catch { /* ignore */ }
+      this.reader = null;
+    }
+    if (this.readLoopPromise) {
+      this.readLoopPromise.catch(() => {});
+    }
     if (transport.datagrams?.readable) {
-      this.readLoopPromise = this.readLoop(transport.datagrams.readable.getReader(), transport.datagrams.writable.getWriter());
+      const reader = transport.datagrams.readable.getReader();
+      if (!reader || typeof reader.read !== 'function') return;
+      this.reader = reader;
+      this.readLoopPromise = this.readLoop(reader);
       this.readLoopPromise.catch((err) => {
         console.warn('[SKYNET] Read loop error:', err);
         this.state = 'degraded';
@@ -96,7 +108,7 @@ export class TransportManager {
     }
   }
 
-  private async readLoop(reader: any, _writer?: any): Promise<void> {
+  private async readLoop(reader: any): Promise<void> {
     try {
       // eslint-disable-next-line no-constant-condition
       while (true) {
@@ -142,14 +154,17 @@ export class TransportManager {
       this.outgoingBuffer.set(peerId, []);
     }
     this.outgoingBuffer.get(peerId)!.push(data);
-    for (const handler of this.messageHandlers) {
-      handler(data, peerId);
+    if (this.outgoingBuffer.get(peerId)!.length > 1000) {
+      this.outgoingBuffer.get(peerId)!.shift();
     }
     if (this.connection?.datagrams?.writable) {
       if (!this.sendWriter) {
         this.sendWriter = this.connection.datagrams.writable.getWriter();
       }
       await this.sendWriter.write(data);
+    }
+    for (const handler of this.messageHandlers) {
+      handler(data, peerId);
     }
   }
 
@@ -164,6 +179,17 @@ export class TransportManager {
     this.state = 'disconnected';
     this.peers.clear();
     this.outgoingBuffer.clear();
-    this.connection = null;
+    if (this.reader) {
+      try { this.reader.cancel(); } catch { /* ignore */ }
+      this.reader = null;
+    }
+    if (this.sendWriter) {
+      try { this.sendWriter.close(); } catch { /* ignore */ }
+      this.sendWriter = null;
+    }
+    if (this.connection) {
+      try { this.connection.close(); } catch { /* ignore */ }
+      this.connection = null;
+    }
   }
 }

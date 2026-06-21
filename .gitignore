@@ -21,3 +21,17 @@ packages/app-ui-orchestrator/apps/web/models/
 
 # Tauri desktop build output
 packages/desktop-node-agent/public/
+
+# Generated JS/declaration files (compiled from TypeScript src/)
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.d.ts.map
+packages/*/test/**/*.js
+packages/*/test/**/*.js.map
+packages/*/test/**/*.d.ts
+packages/*/test/**/*.d.ts.map
+packages/*/scripts/**/*.js
+packages/*/scripts/**/*.js.map
+packages/*/scripts/**/*.d.ts
+packages/*/scripts/**/*.d.ts.map

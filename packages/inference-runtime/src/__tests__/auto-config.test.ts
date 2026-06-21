@@ -34,7 +34,7 @@ describe('AutoConfig', () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('returns model config with GPU layers for NVIDIA GPU', async () => {

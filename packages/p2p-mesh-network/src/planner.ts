@@ -5,7 +5,7 @@ export interface SubTask {
   domain: string;
   requiredTools: string[];
   dependsOn: string[];
-  inputContext?: any;
+  inputContext?: unknown;
   status: 'pending' | 'assigned' | 'running' | 'completed' | 'failed';
 }
 

@@ -2,31 +2,32 @@ export { AutoConfig, type AutoModelConfig, type HardwareDevice, type PlatformTyp
 export { LLaMACppRuntime, type LLaMACppConfig, type LLaMAGenerateResult } from './llamacpp.js';
 export { AgentModel, type AgentModelConfig, type ToolAdapter, type AgentTurnResult } from './agent-model.js';
 export {
-  ExecuTorchRuntime,
-  getAvailableBackends,
-  recommendBackend,
-  estimateMemory as estimateMemoryExecuTorch,
-  type ExecuTorchConfig,
-  type ExecuTorchBackend,
-  type ExecuTorchTensor,
-  type TensorDType,
-  type InferenceResult,
-  type ModelMetadata,
-} from './executorch.js';
-export { MLXRuntime, supportsDelegate } from './mlx.js';
+   ExecuTorchRuntime,
+   getAvailableBackends,
+    recommendBackend,
+   estimateMemory as estimateMemoryExecuTorch,
+   type ExecuTorchConfig,
+   type ExecuTorchBackend,
+   type ExecuTorchTensor,
+   type TensorDType,
+   type InferenceResult,
+   type ModelMetadata,
+ } from './executorch.js';
+export { MLXRuntime, supportsDelegate, type MLXDSDResult } from './mlx.js';
 export { OnnxRuntimeWeb } from './onnx-runtime.js';
 export { OnnxRuntimeMobile, type MobileBackend } from './onnx-mobile.js';
 export {
-  ModelLoader,
-  KNOWN_MODELS,
-  DynamicPrecisionController,
-  estimateMemory as modelEstimateMemory,
-  type ModelConfig,
-  type ModelProvider,
-  type Quantization,
-  type DownloadProgress,
-  MatQuantEncoder,
-} from './model-loader.js';
+   ModelLoader,
+   KNOWN_MODELS,
+   DynamicPrecisionController,
+   estimateMemory as modelEstimateMemory,
+   type ModelConfig,
+   type ModelProvider,
+   type Quantization,
+   type DownloadProgress,
+    type ProgressCallback,
+    MatQuantEncoder,
+ } from './model-loader.js';
 export {
   PluginRegistry, type RegistryEvent, type RegistryEventType, type RegistryCallback,
 } from './plugin-registry.js';
@@ -56,6 +57,15 @@ export {
   type FusionConfig, type FusionResult,
 } from './webgpu-kernel-fusion.js';
 export {
-  LMCacheP2P, DroidSpeakKVSharing, KVCompress,
+  LMCacheP2P, DroidSpeakKVSharing, KVCompress, KVCacheQuantizer,
   type P2PKVCacheEntry, type PeerKVCacheOffer, type RegistryTreeNode,
-} from './kv-cache.js';
+   type QuantizedKVCache, type KVCacheQuantConfig, type QuantBitWidth,
+ } from './kv-cache.js';
+ export { simpleTokenize } from './tokenizer.js';
+ export {
+   ZipNNCompressor,
+   type ZipNNConfig,
+   type ZipNNResult,
+   type ZipNNMetadata,
+   type QuantBitWidth as ZipNNQuantBitWidth,
+ } from './zipnn-compress.js';

@@ -1,5 +1,3 @@
-use tauri::Manager;
-
 mod gpu_detect;
 mod power_mgmt;
 mod node_service;
@@ -31,9 +29,9 @@ pub fn run() {
             moss::reset_moss,
         ])
         .setup(|app| {
-            let _tray = tauri::tray::TrayIconBuilder::new("skynet-tray")
-                .tooltip("SKYNET DePIN Node")
+            let _tray = tauri::tray::TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("SKYNET DePIN Node")
                 .build(app)?;
 
             let state = installer::get_install_state();

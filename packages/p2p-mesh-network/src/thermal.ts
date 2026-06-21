@@ -301,18 +301,19 @@ export class DynamicShifter {
   }
 
   shiftTo(zone: ThermalZone): string {
+    const maxIndex = this.modelChain.length - 1;
     switch (zone) {
       case 'safe':
-        while (this.currentIndex > 0) this.currentIndex--;
+        this.currentIndex = 0;
         break;
       case 'warm':
-        if (this.currentIndex < 1) this.currentIndex = 1;
+        this.currentIndex = Math.min(1, maxIndex);
         break;
       case 'hot':
-        if (this.currentIndex < 2) this.currentIndex = 2;
+        this.currentIndex = Math.min(2, maxIndex);
         break;
       case 'critical':
-        this.currentIndex = this.modelChain.length - 1;
+        this.currentIndex = maxIndex;
         break;
     }
     this.shifts++;
@@ -448,7 +449,7 @@ export class FUSEGovernor {
   prefillConfig(deviceClass: DeviceClass, batchSize: number): void {
     const zones: ThermalZone[] = ['safe', 'warm', 'hot', 'critical'];
     for (const z of zones) {
-      const key = `${deviceClass}_${z}_${batchSize}`;
+      const key = `${deviceClass}_${z}`;
       const profile = FUSE_PROFILES.get(`${deviceClass}_${z}`)!;
       const config: FUSEConfig = { ...profile };
       if (batchSize > 256) {
@@ -534,5 +535,131 @@ export class AGFTScheduler {
 
   getStats(): { qValues: number[]; counts: number[]; totalPlays: number } {
     return { qValues: [...this.qValues], counts: [...this.counts], totalPlays: this.totalPlays };
+  }
+}
+
+export interface CarbonIntensity {
+  region: string;
+  gCo2PerKwh: number;
+  timestamp: number;
+  forecast: number[];
+}
+
+export interface CarbonAwareScore {
+  nodeId: string;
+  thermalScore: number;
+  carbonScore: number;
+  latencyScore: number;
+  combined: number;
+}
+
+export class CarbonMonitor {
+  private regionalIntensity: Map<string, CarbonIntensity> = new Map();
+  private readonly DEFAULT_INTENSITY = 400;
+
+  updateIntensity(region: string, intensity: CarbonIntensity): void {
+    this.regionalIntensity.set(region, intensity);
+  }
+
+  getIntensity(region: string): number {
+    return this.regionalIntensity.get(region)?.gCo2PerKwh ?? this.DEFAULT_INTENSITY;
+  }
+
+  getForecast(region: string): number[] {
+    return this.regionalIntensity.get(region)?.forecast ?? [];
+  }
+
+  getMarginalIntensity(region: string): number {
+    const data = this.regionalIntensity.get(region);
+    if (!data || data.forecast.length < 1) return this.getIntensity(region);
+    const current = data.gCo2PerKwh;
+    const next = data.forecast[0];
+    return Math.min(current, next);
+  }
+
+  estimateEmissions(powerDrawW: number, durationMs: number, region: string): number {
+    const intensity = this.getIntensity(region);
+    const kwh = (powerDrawW * durationMs) / (1000 * 3600 * 1000);
+    return kwh * intensity;
+  }
+}
+
+export class CarbonScheduler {
+  private carbonMonitor: CarbonMonitor;
+  private thermalManager: ThermalManager | null;
+  private readonly carbonWeight: number;
+  private readonly thermalWeight: number;
+  private readonly latencyWeight: number;
+  private nodeLatencies: Map<string, number> = new Map();
+
+  constructor(
+    carbonMonitor: CarbonMonitor = new CarbonMonitor(),
+    thermalManager: ThermalManager | null = null,
+    weights: { carbon?: number; thermal?: number; latency?: number } = {},
+  ) {
+    this.carbonMonitor = carbonMonitor;
+    this.thermalManager = thermalManager;
+    this.carbonWeight = weights.carbon ?? 0.4;
+    this.thermalWeight = weights.thermal ?? 0.3;
+    this.latencyWeight = weights.latency ?? 0.3;
+  }
+
+  setThermalManager(tm: ThermalManager): void {
+    this.thermalManager = tm;
+  }
+
+  updateLatency(nodeId: string, latencyMs: number): void {
+    this.nodeLatencies.set(nodeId, latencyMs);
+  }
+
+  scoreNode(nodeId: string, region: string, powerDrawW: number): CarbonAwareScore {
+    const carbonIntensity = this.carbonMonitor.getIntensity(region);
+    const maxIntensity = 800;
+    const carbonScore = 1 - Math.min(1, carbonIntensity / maxIntensity);
+
+    const headroom = this.thermalManager?.getEffectiveHeadroom() ?? 10;
+    const thermalScore = Math.min(1, headroom / 16);
+
+    const latencyMs = this.nodeLatencies.get(nodeId) ?? 100;
+    const maxLatency = 2000;
+    const latencyScore = 1 - Math.min(1, latencyMs / maxLatency);
+
+    const powerPenalty = Math.min(1, powerDrawW / 500);
+    const combined =
+      carbonScore * this.carbonWeight +
+      thermalScore * this.thermalWeight +
+      latencyScore * this.latencyWeight -
+      powerPenalty * 0.05;
+
+    return { nodeId, thermalScore, carbonScore, latencyScore, combined };
+  }
+
+  rankNodes(nodes: Array<{ nodeId: string; region: string; powerDrawW: number }>): CarbonAwareScore[] {
+    return nodes
+      .map(n => this.scoreNode(n.nodeId, n.region, n.powerDrawW))
+      .sort((a, b) => b.combined - a.combined);
+  }
+
+  shouldOffload(
+    localScore: CarbonAwareScore,
+    remoteScore: CarbonAwareScore,
+    threshold: number = 0.1,
+  ): boolean {
+    return remoteScore.combined > localScore.combined + threshold;
+  }
+
+  getCarbonMonitor(): CarbonMonitor {
+    return this.carbonMonitor;
+  }
+
+  estimateSavings(
+    currentEmissions: number,
+    proposedEmissions: number,
+  ): { reduction: number; percentReduction: number } {
+    const reduction = currentEmissions - proposedEmissions;
+    const percentReduction = currentEmissions > 0
+      ? (reduction / currentEmissions) * 100
+      : 0;
+    return { reduction: Math.max(0, reduction), percentReduction: Math.max(0, percentReduction) };
   }
 }

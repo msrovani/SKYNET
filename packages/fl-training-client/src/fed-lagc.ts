@@ -48,6 +48,7 @@ export class FedLAGC {
   extractSubmodel(config: SubmodelConfig): Map<string, Float32Array> {
     const result: Map<string, Float32Array> = new Map();
     const numSubmodelLayers = config.endLayer - config.startLayer;
+    if (numSubmodelLayers === 0) return result;
     for (const [name, weights] of this.globalModel) {
       const layerIndex = this.parseLayerIndex(name);
       if (layerIndex >= config.startLayer && layerIndex < config.endLayer) {
@@ -66,6 +67,7 @@ export class FedLAGC {
   ): Map<string, Float32Array> {
     const corrected: Map<string, Float32Array> = new Map();
     const numSubmodelLayers = config.endLayer - config.startLayer;
+    if (numSubmodelLayers === 0) return corrected;
     const scalingFactor = this.totalLayers / numSubmodelLayers;
     for (const [name, weights] of this.globalModel) {
       const layerIndex = this.parseLayerIndex(name);

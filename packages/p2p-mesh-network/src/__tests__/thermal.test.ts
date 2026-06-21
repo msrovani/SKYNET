@@ -1,8 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 describe('ThermalManager', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('starts in safe zone', async () => {
@@ -180,5 +184,125 @@ describe('DynamicShifter', () => {
     const ds = new DynamicShifter(['full', 'medium', 'reduced', 'minimal'], 0);
     ds.shiftTo('hot');
     expect(ds.getCurrentModel()).toBe('reduced');
+  });
+});
+
+describe('CarbonMonitor', () => {
+  it('returns default intensity for unknown region', async () => {
+    const { CarbonMonitor } = await import('../thermal.js');
+    const cm = new CarbonMonitor();
+    expect(cm.getIntensity('unknown')).toBe(400);
+  });
+
+  it('stores and retrieves regional intensity', async () => {
+    const { CarbonMonitor } = await import('../thermal.js');
+    const cm = new CarbonMonitor();
+    cm.updateIntensity('us-east', { region: 'us-east', gCo2PerKwh: 350, timestamp: Date.now(), forecast: [340, 330, 320] });
+    expect(cm.getIntensity('us-east')).toBe(350);
+  });
+
+  it('returns forecast data', async () => {
+    const { CarbonMonitor } = await import('../thermal.js');
+    const cm = new CarbonMonitor();
+    cm.updateIntensity('eu-west', { region: 'eu-west', gCo2PerKwh: 200, timestamp: Date.now(), forecast: [190, 180] });
+    expect(cm.getForecast('eu-west')).toEqual([190, 180]);
+  });
+
+  it('returns marginal intensity as min of current and next forecast', async () => {
+    const { CarbonMonitor } = await import('../thermal.js');
+    const cm = new CarbonMonitor();
+    cm.updateIntensity('us-west', { region: 'us-west', gCo2PerKwh: 400, timestamp: Date.now(), forecast: [350, 300] });
+    expect(cm.getMarginalIntensity('us-west')).toBe(350);
+  });
+
+  it('estimates emissions from power draw and duration', async () => {
+    const { CarbonMonitor } = await import('../thermal.js');
+    const cm = new CarbonMonitor();
+    cm.updateIntensity('dirty-grid', { region: 'dirty-grid', gCo2PerKwh: 800, timestamp: Date.now(), forecast: [] });
+    const emissions = cm.estimateEmissions(100, 3600000, 'dirty-grid');
+    expect(emissions).toBeGreaterThan(0);
+  });
+});
+
+describe('CarbonScheduler', () => {
+  it('scores nodes by carbon, thermal, and latency', async () => {
+    const { CarbonScheduler, CarbonMonitor, ThermalManager } = await import('../thermal.js');
+    const cm = new CarbonMonitor();
+    cm.updateIntensity('clean', { region: 'clean', gCo2PerKwh: 100, timestamp: Date.now(), forecast: [] });
+    cm.updateIntensity('dirty', { region: 'dirty', gCo2PerKwh: 700, timestamp: Date.now(), forecast: [] });
+    const tm = new ThermalManager('desktop');
+    tm.recordReading({ timestamp: 1, temperature: 40, headroom: 16, cpuLoad: 0.1, gpuLoad: 0.1, batteryLevel: 100, isCharging: true });
+    const scheduler = new CarbonScheduler(cm, tm);
+    const cleanScore = scheduler.scoreNode('node-clean', 'clean', 100);
+    const dirtyScore = scheduler.scoreNode('node-dirty', 'dirty', 100);
+    expect(cleanScore.combined).toBeGreaterThan(dirtyScore.combined);
+    expect(cleanScore.carbonScore).toBeGreaterThan(dirtyScore.carbonScore);
+  });
+
+  it('ranks nodes in descending combined score', async () => {
+    const { CarbonScheduler, CarbonMonitor, ThermalManager } = await import('../thermal.js');
+    const cm = new CarbonMonitor();
+    cm.updateIntensity('a', { region: 'a', gCo2PerKwh: 100, timestamp: Date.now(), forecast: [] });
+    cm.updateIntensity('b', { region: 'b', gCo2PerKwh: 800, timestamp: Date.now(), forecast: [] });
+    const tm = new ThermalManager('desktop');
+    tm.recordReading({ timestamp: 1, temperature: 40, headroom: 16, cpuLoad: 0.1, gpuLoad: 0.1, batteryLevel: 100, isCharging: true });
+    const scheduler = new CarbonScheduler(cm, tm);
+    const ranked = scheduler.rankNodes([
+      { nodeId: 'clean', region: 'a', powerDrawW: 100 },
+      { nodeId: 'dirty', region: 'b', powerDrawW: 100 },
+    ]);
+    expect(ranked.length).toBe(2);
+    expect(ranked[0].nodeId).toBe('clean');
+    expect(ranked[1].nodeId).toBe('dirty');
+  });
+
+  it('recommends offload when remote score exceeds local by threshold', async () => {
+    const { CarbonScheduler, CarbonMonitor } = await import('../thermal.js');
+    const cm = new CarbonMonitor();
+    cm.updateIntensity('local', { region: 'local', gCo2PerKwh: 700, timestamp: Date.now(), forecast: [] });
+    cm.updateIntensity('remote', { region: 'remote', gCo2PerKwh: 50, timestamp: Date.now(), forecast: [] });
+    const scheduler = new CarbonScheduler(cm, null);
+    const local = scheduler.scoreNode('local', 'local', 100);
+    const remote = scheduler.scoreNode('remote', 'remote', 100);
+    expect(scheduler.shouldOffload(local, remote, 0.05)).toBe(true);
+  });
+
+  it('keeps local if remote score is not better', async () => {
+    const { CarbonScheduler, CarbonMonitor } = await import('../thermal.js');
+    const cm = new CarbonMonitor();
+    cm.updateIntensity('a', { region: 'a', gCo2PerKwh: 400, timestamp: Date.now(), forecast: [] });
+    cm.updateIntensity('b', { region: 'b', gCo2PerKwh: 400, timestamp: Date.now(), forecast: [] });
+    const scheduler = new CarbonScheduler(cm, null);
+    const a = scheduler.scoreNode('a', 'a', 100);
+    const b = scheduler.scoreNode('b', 'b', 100);
+    expect(scheduler.shouldOffload(a, b, 0.2)).toBe(false);
+  });
+
+  it('estimates savings between current and proposed emissions', async () => {
+    const { CarbonScheduler } = await import('../thermal.js');
+    const scheduler = new CarbonScheduler();
+    const savings = scheduler.estimateSavings(100, 60);
+    expect(savings.reduction).toBe(40);
+    expect(savings.percentReduction).toBe(40);
+  });
+
+  it('returns zero savings when proposed exceeds current', async () => {
+    const { CarbonScheduler } = await import('../thermal.js');
+    const scheduler = new CarbonScheduler();
+    const savings = scheduler.estimateSavings(50, 80);
+    expect(savings.reduction).toBe(0);
+    expect(savings.percentReduction).toBe(0);
+  });
+
+  it('updateLatency affects scoring', async () => {
+    const { CarbonScheduler, CarbonMonitor } = await import('../thermal.js');
+    const cm = new CarbonMonitor();
+    cm.updateIntensity('r1', { region: 'r1', gCo2PerKwh: 400, timestamp: Date.now(), forecast: [] });
+    const scheduler = new CarbonScheduler(cm, null, { carbon: 0.2, thermal: 0.2, latency: 0.6 });
+    scheduler.updateLatency('slow', 500);
+    scheduler.updateLatency('fast', 20);
+    const slow = scheduler.scoreNode('slow', 'r1', 100);
+    const fast = scheduler.scoreNode('fast', 'r1', 100);
+    expect(fast.combined).toBeGreaterThan(slow.combined);
   });
 });

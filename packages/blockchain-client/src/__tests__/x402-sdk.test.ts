@@ -62,11 +62,14 @@ describe('SettlementCache', () => {
   it('allows after TTL expiry (mock Date)', () => {
     const orig = Date.now;
     const now = 1000000;
-    Date.now = vi.fn(() => now);
-    cache.markSettled('ch1', 1, 1000);
-    Date.now = vi.fn(() => now + 121_000);
-    expect(cache.isDuplicate('ch1', 1)).toBe(false);
-    Date.now = orig;
+    try {
+      Date.now = vi.fn(() => now);
+      cache.markSettled('ch1', 1, 1000);
+      Date.now = vi.fn(() => now + 121_000);
+      expect(cache.isDuplicate('ch1', 1)).toBe(false);
+    } finally {
+      Date.now = orig;
+    }
   });
 
   it('clear removes all entries', () => {

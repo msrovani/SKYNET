@@ -40,6 +40,7 @@ export class RoleElection {
   }
 
   start(): void {
+    if (this.electionInterval) return;
     this.emit('promoted', { role: this.localRole });
     this.broadcastCapability();
     this.electionInterval = setInterval(() => this.runElection(), this.ELECTION_MS);
@@ -48,6 +49,7 @@ export class RoleElection {
   stop(): void {
     if (this.electionInterval) clearInterval(this.electionInterval);
     if (this.l3Heartbeat) clearInterval(this.l3Heartbeat);
+    this.peerScores.clear();
   }
 
   private broadcastCapability(): void {
@@ -141,5 +143,9 @@ export class RoleElection {
     for (const cb of this.callbacks) {
       try { cb(event, data); } catch { /* ignore handler errors */ }
     }
+  }
+
+  removePeer(peerId: string): void {
+    this.peerScores.delete(peerId);
   }
 }

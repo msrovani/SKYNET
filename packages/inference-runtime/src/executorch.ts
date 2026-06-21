@@ -95,13 +95,6 @@ function getAvailableBackendsReal(): ExecuTorchBackend[] {
 
 export function getAvailableBackends(): ExecuTorchBackend[] { return getAvailableBackendsReal(); }
 
-export function getHardwareBackends(): ExecuTorchBackend[] {
-  const backends = getAvailableBackendsReal();
-  if (typeof navigator !== 'undefined' && 'gpu' in navigator && !backends.includes('vulkan')) backends.push('vulkan');
-  if (typeof process !== 'undefined' && process.platform === 'darwin' && !backends.includes('coreml')) backends.push('coreml');
-  if (typeof process !== 'undefined' && (process.platform === 'android' || process.platform === 'linux') && !backends.includes('qnn')) backends.push('qnn');
-  return [...new Set(backends)];
-}
 
 export function recommendBackend(deviceMemoryGb: number, isMobile: boolean, osPlatform?: string): ExecuTorchBackend {
   const platform = osPlatform ?? process.platform;
@@ -187,7 +180,7 @@ export class ExecuTorchRuntime {
     if (this.onnxSession && this.onnxOrt) {
       try {
         const Tensor = this.onnxOrt.Tensor;
-        const inputTensor = new Tensor('int64', BigInt64Array.from(inputArray.map(BigInt)), [1, inputArray.length]);
+        const inputTensor = new Tensor('int64', BigInt64Array.from(inputArray.map(v => BigInt(Math.round(v)))), [1, inputArray.length]);
         const feeds: Record<string, any> = {};
         feeds[this.onnxSession.inputNames[0]] = inputTensor;
         const results = await this.onnxSession.run(feeds);

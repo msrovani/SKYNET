@@ -42,4 +42,8 @@ export class FailoverManager {
       clearInterval(this.heartbeatInterval);
     }
   }
+
+  removePeer(peerId: string): void {
+    this.peerTimeouts.delete(peerId);
+  }
 }

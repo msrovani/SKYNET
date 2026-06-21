@@ -1,8 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { AttestationManager } from '../attestation.js';
 
 describe('AttestationManager', () => {
-  const manager = new AttestationManager({ simulate: true });
+  let manager: AttestationManager;
+
+  beforeEach(() => {
+    manager = new AttestationManager({ simulate: true });
+  });
 
   it('generates a quote with measurement hash', async () => {
     const data = new TextEncoder().encode('skynet-inference-payload');

@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.14.1] — 2026-06-20 — Sprint 14.8: Bug Hunt — 9 Categorias, 57 bugs + dead code
+
+### Bug Hunt — 57 bugs corrigidos em 8 packages
+- **Categoria 1 — Types (15 bugs)**: `as any` removidos, `unknown` em callbacks, barrel exports +26
+- **Categoria 2 — Runtime (10 bugs)**: empty guards, stride fix, fuse cache key, `BigInt()` rounding
+- **Categoria 3 — Race conditions (14 bugs)**: connect re-entrancy, double-interval guard, TOCTOU, settled flags
+- **Categoria 4 — Memory/Resource (9 bugs)**: reader lifecycle, buffer caps, LRU eviction, cancel in finally
+- **Categoria 5 — Edge cases (10 bugs)**: empty data/peers/hostIds guards, 8-bit dequant, div-by-zero
+- **Categoria 6 — API drift (26 barrel exports)**: inference-runtime +10, fl-training-client +7, blockchain-client +8, p2p-mesh-network +1
+- **Categoria 7 — Test isolation (7 fixes)**: shared state moved to beforeEach, timers restored, globals unstubbed
+- **Categoria 8 — Error swallowing (0 bugs)**: todos os 82 `catch {}` são fallback intencional
+- **Categoria 9 — Dead code (6 removals)**: `getHardwareBackends`, `NestedPrecision`, 2 deps fl-training-client
+- **Categoria 10 — Numeric precision (5 bugs)**: `1<<quantBits` overflow lookup table, `parseInt` sem radix, `Math.round` SOL→lamports, nibble order stub vs Rust, OOB write flat indexing
+
+### Fixed
+- `1 << quantBits` overflow (quantBits≥32 crasha range) → lookup table `MAX_QUANT_LOOKUP` em `zipnn-compress.ts`, `quic-fl.ts`
+- `parseInt` sem radix (4 ocorrências) em `auto-config.ts`
+- `capacitySol * 1e9` sem `Math.round` → perda de precisão em `solana-x402.ts`
+- TS stub nibble order invertido vs Rust em `core-wasm-engine/stub/index.ts`
+- `encodeInt4`/`extractInt2` out-of-bounds write com blockSize não-potência-de-2 → flat indexing em `model-loader.ts`
+- Test isolation: timers/mocks/globals restaurados em afterEach em 7 test files
+- Dead exports: `getHardwareBackends`, `NestedPrecision` removidos
+- Deps mortas: `@skynet/p2p-mesh-network`, `@skynet/blockchain-client` removidos de `fl-training-client`
+
+### Tests
+- **642 total** (41 core-wasm-engine + 69 blockchain-client + 157 inference-runtime + 27 desktop-node-agent + 243 p2p-mesh-network + 51 tee-attestation + 7 app-ui-orchestrator + 47 fl-training-client)
+- 16/16 tasks via `pnpm test`. 0 ESLint errors/warnings em 8/8 packages
+- `pnpm build` compila 0 erros TypeScript
+
 ## [0.14.0] — 2026-06-17 — Sprint 14.7: ZipNN Bit-Packing + WebGPU Kernel Fusion + QUIC-FL
 
 ### Added

@@ -19,8 +19,8 @@ export class LVSAVerifier {
   }
 
   submitMask(clientId: string, mask: MaskedGradient): void {
-    this.receivedMasks.set(clientId, mask);
     if (!this.verifyMask(mask)) throw new Error('Invalid mask');
+    this.receivedMasks.set(clientId, mask);
   }
 
   private verifyMask(mask: MaskedGradient): boolean {
@@ -37,10 +37,15 @@ export class LVSAVerifier {
     if (clients.length === 0 || clients.length < Math.ceil(this.expectedClientCount * 0.5)) return null;
     const dim = clients[0].maskedUpdate.length;
     const aggregated = new Array(dim).fill(0);
+    const maskSum = new Array(dim).fill(0);
     for (const c of clients) {
       for (let i = 0; i < dim; i++) {
-        aggregated[i] += c.maskedUpdate[i] / clients.length;
+        aggregated[i] += c.maskedUpdate[i];
+        maskSum[i] += c.maskHint[i % c.maskHint.length];
       }
+    }
+    for (let i = 0; i < dim; i++) {
+      aggregated[i] = (aggregated[i] - maskSum[i]) / clients.length;
     }
     let totalNorm = 0;
     for (let i = 0; i < dim; i++) totalNorm += aggregated[i] * aggregated[i];
@@ -90,11 +95,15 @@ export class InnerProductVerifier {
   private computeInnerProduct(data: number[], reference: number[]): number {
     const len = Math.min(data.length, reference.length);
     let sum = 0;
+    let dataSq = 0;
+    let refSq = 0;
     for (let i = 0; i < len; i++) {
       sum += data[i] * reference[i];
+      dataSq += data[i] * data[i];
+      refSq += reference[i] * reference[i];
     }
-    const dataNorm = Math.sqrt(data.reduce((s, v) => s + v * v, 0));
-    const refNorm = Math.sqrt(reference.reduce((s, v) => s + v * v, 0));
+    const dataNorm = Math.sqrt(dataSq);
+    const refNorm = Math.sqrt(refSq);
     if (dataNorm === 0 || refNorm === 0) return 0;
     return sum / (dataNorm * refNorm);
   }

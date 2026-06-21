@@ -54,7 +54,7 @@ export class FedYogi {
         (1 - this.config.beta1) * avgUpdate[i];
       const g = avgUpdate[i];
       const g2 = g * g;
-      this.state.variance[i] -= (1 - this.config.beta2) * g2 * (Math.sign(this.state.variance[i] - g2) || 1);
+      this.state.variance[i] -= (1 - this.config.beta2) * g2 * Math.sign(this.state.variance[i] - g2);
     }
     const result = new Array(numParams);
     for (let i = 0; i < numParams; i++) {
@@ -206,7 +206,7 @@ export class LEGACYScheduler {
   getCompressionRatio(): number {
     this.steps++;
     const progress = Math.min(1, this.steps / this.maxSteps);
-    return this.minRatio + (this.maxRatio - this.minRatio) * (1 - progress);
+    return this.minRatio + (this.maxRatio - this.minRatio) * progress;
   }
 
   applyToGradients(gradients: number[][], compressFn: (g: number[], r: number) => number[]): number[][] {
@@ -261,7 +261,7 @@ export class FedAWAWeighting {
           return bonus / (1 + Math.sqrt(consistency) * 0.01);
         }
       }
-      return bonus + 0.1;
+      return 0.1;
     });
     const sum = weights.reduce((s, w) => s + w, 0);
     return sum > 0 ? weights.map(w => w / sum) : new Array(clientUpdates.length).fill(1 / clientUpdates.length);

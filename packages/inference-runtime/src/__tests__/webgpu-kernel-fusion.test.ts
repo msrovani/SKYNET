@@ -1,24 +1,24 @@
-import { describe, it, expect, vi } from 'vitest';
-import { WebGpuKernelFusion, FusionConfig, FusionResult } from '../webgpu-kernel-fusion.js';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { WebGpuKernelFusion } from '../webgpu-kernel-fusion.js';
 
 describe('WebGpuKernelFusion', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   describe('isAvailable', () => {
     it('returns false in Node.js', () => {
       expect(WebGpuKernelFusion.isAvailable()).toBe(false);
     });
 
     it('returns true when navigator.gpu exists', () => {
-      const origNav = globalThis.navigator;
-      (globalThis as any).navigator = { gpu: {} };
+      vi.stubGlobal('navigator', { gpu: {} });
       expect(WebGpuKernelFusion.isAvailable()).toBe(true);
-      (globalThis as any).navigator = origNav;
     });
 
     it('returns false when navigator is undefined', () => {
-      const origNav = globalThis.navigator;
-      (globalThis as any).navigator = undefined;
+      vi.stubGlobal('navigator', undefined);
       expect(WebGpuKernelFusion.isAvailable()).toBe(false);
-      (globalThis as any).navigator = origNav;
     });
   });
 

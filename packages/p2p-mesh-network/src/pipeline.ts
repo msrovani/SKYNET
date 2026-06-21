@@ -38,7 +38,7 @@ export interface PipelineEvent {
   type: PipelineEventType;
   peerId?: string;
   stageIndex?: number;
-  data?: any;
+  data?: unknown;
 }
 
 export type PipelineCallback = (event: PipelineEvent) => void;
@@ -139,8 +139,8 @@ export class PipelineManager {
     if (!this.transport) throw new Error('Transport not set');
     try {
       await this.transport.send(data, targetPeerId);
-    } catch (err: any) {
-      this.emit({ type: 'forward-error', peerId: targetPeerId, data: (err as any)?.message ?? String(err) });
+    } catch (err: unknown) {
+      this.emit({ type: 'forward-error', peerId: targetPeerId, data: err instanceof Error ? err.message : String(err) });
       throw err;
     }
   }
@@ -168,7 +168,7 @@ export class PipelineManager {
     this.activeStages.clear();
     const newAssignment = this.createPartition(remainingPeers);
     this.assignment = newAssignment;
-    this.emit({ type: 'pipeline-reconfigured', data: newAssignment });
+    queueMicrotask(() => this.emit({ type: 'pipeline-reconfigured', data: newAssignment }));
   }
 
   isPipelineComplete(): boolean {
@@ -227,6 +227,7 @@ export class MoEParallelFolding {
 
   assignPeersToLayers(layers: number[], peers: PeerCapability[]): Map<number, string> {
     const assignment = new Map<number, string>();
+    if (peers.length === 0) return assignment;
     const sortedPeers = [...peers].sort((a, b) => b.gpuTflops - a.gpuTflops);
     const numPeers = sortedPeers.length;
     layers.forEach((layer, idx) => {

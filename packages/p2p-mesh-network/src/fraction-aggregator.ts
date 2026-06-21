@@ -166,6 +166,9 @@ export class FractionAggregator {
     };
 
     this.emit('aggregation_complete', result);
+    for (const stId of expectedSubTaskIds) {
+      this.fractions.delete(stId);
+    }
     return result;
   }
 

@@ -14,6 +14,7 @@ export class WebRTCFallback {
   };
 
   async connect(): Promise<void> {
+    this.disconnect();
     this.pc = new RTCPeerConnection(this.config);
     this.dataChannel = this.pc.createDataChannel('skynet-mesh', {
       ordered: false,

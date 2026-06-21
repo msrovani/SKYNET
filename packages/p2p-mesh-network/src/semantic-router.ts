@@ -69,6 +69,7 @@ export class HnswIndex {
   }
 
   add(id: string, vector: Float32Array): void {
+    if (this.vectors.has(id)) return;
     this.vectors.set(id, vector);
     this.labels.push(id);
 
@@ -195,6 +196,10 @@ export class SemanticRouter {
 
   recordRoutingSuccess(subtaskId: string, agentId: string, queryEmbedding: Float32Array): void {
     this.successHistory.set(agentId, (this.successHistory.get(agentId) || 0) + 1);
+    if (this.successHistory.size > 500) {
+      const first = this.successHistory.keys().next().value;
+      if (first) this.successHistory.delete(first);
+    }
     this.queryVectors.set(`${agentId}/${subtaskId}`, queryEmbedding);
     if (this.queryVectors.size > 500) {
       const first = this.queryVectors.keys().next().value;
@@ -203,22 +208,17 @@ export class SemanticRouter {
   }
 
   recordRoutingFailure(subtaskId: string, agentId: string): void {
-    this.successHistory.set(agentId, Math.max(0, (this.successHistory.get(agentId) || 1) - 1));
+    this.successHistory.set(agentId, Math.max(0, (this.successHistory.get(agentId) || 0) - 1));
   }
 
   computeAdaptiveWeights(agent: AgentRegistration): { semantic: number; tool: number; cost: number; latency: number } {
     const successes = this.successHistory.get(agent.agentId) || 0;
     const reliability = Math.min(1, successes / 10);
-    const semantic = 0.5 + reliability * 0.15;
-    const tool = 0.3 + reliability * 0.1;
-    const cost = Math.max(0.01, 0.1 - reliability * 0.09);
-    const latency = Math.max(0.01, 0.1 - reliability * 0.09);
-    const total = semantic + tool + cost + latency;
     return {
-      semantic: semantic / total,
-      tool: tool / total,
-      cost: cost / total,
-      latency: latency / total,
+      semantic: 0.5 + reliability * 0.15,
+      tool: 0.3 + reliability * 0.1,
+      cost: 0.1,
+      latency: 0.1,
     };
   }
 
@@ -306,6 +306,11 @@ export class SemanticRouter {
       });
     }
 
+    if (best.combinedScore < 0) {
+      this.emit('route_failed', { subtaskId: subtask.id, score: best.combinedScore });
+      return null;
+    }
+
     return best;
   }
 
@@ -351,5 +356,135 @@ export class SemanticRouter {
   clear(): void {
     this.agents.clear();
     this.index.clear();
+  }
+}
+
+export interface NeuronGroup {
+  id: string;
+  layerIndex: number;
+  importance: number;
+  size: number;
+  isCritical: boolean;
+}
+
+export interface NodeHealth {
+  nodeId: string;
+  packetLoss: number;
+  rttMs: number;
+  bandwidthMbps: number;
+  uptime: number;
+  isStable: boolean;
+}
+
+export class LossyAwareRouter {
+  private neuronGroups: Map<string, NeuronGroup[]> = new Map();
+  private nodeHealth: Map<string, NodeHealth> = new Map();
+  private readonly LOSS_THRESHOLD = 0.15;
+
+  registerNeuronGroups(modelId: string, groups: NeuronGroup[]): void {
+    const sorted = [...groups].sort((a, b) => b.importance - a.importance);
+    const thresholdIdx = Math.floor(sorted.length * 0.3);
+    for (let i = 0; i < sorted.length; i++) {
+      sorted[i].isCritical = i < thresholdIdx;
+    }
+    this.neuronGroups.set(modelId, sorted);
+  }
+
+  updateNodeHealth(nodeId: string, health: Partial<NodeHealth>): void {
+    const existing = this.nodeHealth.get(nodeId) ?? {
+      nodeId, packetLoss: 0, rttMs: 0, bandwidthMbps: 0, uptime: 0, isStable: true,
+    };
+    Object.assign(existing, health);
+    existing.isStable = existing.packetLoss < this.LOSS_THRESHOLD;
+    this.nodeHealth.set(nodeId, existing);
+  }
+
+  getNodeHealth(nodeId: string): NodeHealth | undefined {
+    return this.nodeHealth.get(nodeId);
+  }
+
+  getStableNodes(): string[] {
+    return Array.from(this.nodeHealth.entries())
+      .filter(([, h]) => h.isStable)
+      .map(([id]) => id);
+  }
+
+  getUnstableNodes(): string[] {
+    return Array.from(this.nodeHealth.entries())
+      .filter(([, h]) => !h.isStable)
+      .map(([id]) => id);
+  }
+
+  allocateGroupsToNodes(
+    modelId: string,
+    nodeIds: string[],
+    minCriticalNodes: number = 2,
+  ): Map<string, NeuronGroup[]> {
+    const groups = this.neuronGroups.get(modelId);
+    if (!groups) return new Map();
+
+    const critical = groups.filter(g => g.isCritical);
+    const nonCritical = groups.filter(g => !g.isCritical);
+    const stable = this.getStableNodes().filter(n => nodeIds.includes(n));
+    const unstable = this.getUnstableNodes().filter(n => nodeIds.includes(n));
+
+    if (stable.length < minCriticalNodes) return new Map();
+
+    const allocation = new Map<string, NeuronGroup[]>();
+    let critIdx = 0;
+    for (const nodeId of stable) {
+      if (critIdx < critical.length) {
+        const assigned = critical.slice(critIdx, critIdx + 1);
+        allocation.set(nodeId, [assigned[0]]);
+        critIdx++;
+      }
+    }
+    while (critIdx < critical.length) {
+      const target = stable[critIdx % stable.length];
+      if (!allocation.has(target)) allocation.set(target, []);
+      allocation.get(target)!.push(critical[critIdx]);
+      critIdx++;
+    }
+    let nonCritIdx = 0;
+    const allNodes = stable.concat(unstable);
+    for (const nodeId of allNodes) {
+      if (nonCritIdx >= nonCritical.length) break;
+      if (!allocation.has(nodeId)) allocation.set(nodeId, []);
+      allocation.get(nodeId)!.push(nonCritical[nonCritIdx]);
+      nonCritIdx++;
+    }
+    return allocation;
+  }
+
+  predictImportance(modelId: string, activationPattern: Float32Array): Map<number, number> {
+    const groups = this.neuronGroups.get(modelId);
+    if (!groups) return new Map();
+    const scores = new Map<number, number>();
+    for (const g of groups) {
+      const sum = Array.from(activationPattern).reduce((s, v, i) => {
+        if (i >= g.layerIndex && i < g.layerIndex + g.size) return s + Math.abs(v);
+        return s;
+      }, 0);
+      const normScore = sum / Math.max(g.size, 1);
+      scores.set(g.layerIndex, normScore * g.importance);
+    }
+    return scores;
+  }
+
+  getRoutingAdvice(modelId: string, nodeId: string): 'critical' | 'standard' | 'avoid' {
+    const health = this.nodeHealth.get(nodeId);
+    if (!health) return 'standard';
+    if (health.packetLoss >= 0.3) return 'avoid';
+    if (health.packetLoss >= this.LOSS_THRESHOLD) return 'standard';
+    const groups = this.neuronGroups.get(modelId);
+    if (!groups || groups.filter(g => g.isCritical).length === 0) return 'standard';
+    const criticalCount = groups.filter(g => g.isCritical).length;
+    if (criticalCount > 5 && health.packetLoss < 0.05) return 'critical';
+    return 'standard';
+  }
+
+  clear(): void {
+    this.neuronGroups.clear();
+    this.nodeHealth.clear();
   }
 }

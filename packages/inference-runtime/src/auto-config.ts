@@ -53,7 +53,7 @@ function detectCUDADevices(): HardwareDevice[] {
         if (parts.length >= 2) {
           const name = parts[0].trim();
           const vramMatch = parts[1].trim().match(/(\d+)/);
-          const vramMB = vramMatch ? parseInt(vramMatch[1]) : 4096;
+          const vramMB = vramMatch ? parseInt(vramMatch[1], 10) : 4096;
           devices.push({ type: 'cuda', name, vramMB, backendPriority: 1 });
         }
       } catch { /* skip bad line */ }
@@ -99,7 +99,7 @@ function detectDesktopHW(): { cpuCores: number; freeRamMB: number; totalRamMB: n
       for (const line of df.trim().split('\n').slice(1)) {
         const m = line.match(/(\w):\s+(\d+)\s+(\d+)/);
         if (m) {
-          const free = Math.floor(parseInt(m[3]) / (1024 * 1024));
+          const free = Math.floor(parseInt(m[3], 10) / (1024 * 1024));
           if (free > freeDiskMB) freeDiskMB = free;
         }
       }
@@ -108,7 +108,7 @@ function detectDesktopHW(): { cpuCores: number; freeRamMB: number; totalRamMB: n
       const lines = df.trim().split('\n');
       if (lines.length > 1) {
         const parts = lines[1].split(/\s+/);
-        freeDiskMB = Math.floor(parseInt(parts[3]) / 1024);
+        freeDiskMB = Math.floor(parseInt(parts[3], 10) / 1024);
       }
     }
   } catch { freeDiskMB = 50000; }
@@ -127,7 +127,7 @@ function detectAppleDevices(_totalRamMB?: number): HardwareDevice[] {
   const devices: HardwareDevice[] = [];
   try {
     const sysctl = execSync('sysctl -n hw.memsize', { encoding: 'utf-8', timeout: 3000 });
-    const totalBytes = parseInt(sysctl.trim());
+    const totalBytes = parseInt(sysctl.trim(), 10);
     const totalGB = Math.floor(totalBytes / (1024 * 1024 * 1024));
     devices.push({ type: 'metal', name: `Apple Silicon ${totalGB}GB Unified`, backendPriority: 2 });
     devices.push({ type: 'coreml', name: 'Apple Neural Engine', backendPriority: 3 });

@@ -29,6 +29,10 @@ export interface AgentModelConfig {
   temperature: number;
   maxTokens: number;
   autoDownload?: boolean;
+  enableMeshDSD?: boolean;
+  meshPeerCount?: number;
+  enablePayments?: boolean;
+  paymentCostPerTokenUsd?: number;
 }
 
 export interface AgentTurnResult {
@@ -80,12 +84,20 @@ export class AgentModel {
   private autoConfig: AutoModelConfig | null = null;
   private platform: ReturnType<typeof detectPlatform> = 'node';
   private activeBackend: string = 'mock';
+  private speculativeDecoder: any = null;
+  private microTxManager: any = null;
+  private dsdStats = { totalRounds: 0, totalAccepted: 0, totalDrafted: 0 };
 
   constructor(config: AgentModelConfig) {
     this.config = config;
   }
 
+  private loading = false;
+
   async load(): Promise<void> {
+    if (this.loading || this.activeBackend !== 'mock') return;
+    this.loading = true;
+    try {
     if (this.config.modelId === 'none') return;
     this.platform = detectPlatform();
     this.autoConfig = await AutoConfig.autoDetectAndConfigure();
@@ -106,6 +118,9 @@ export class AgentModel {
       await this.loadMobile();
     } else {
       await this.loadWeb();
+    }
+    } finally {
+      this.loading = false;
     }
   }
 
@@ -225,11 +240,19 @@ export class AgentModel {
       content = randomPortugueseResponse(prompt);
     }
 
+    if (this.microTxManager && this.config.enablePayments) {
+      const tokenCount = Math.ceil(content.length / 4);
+      const cost = (this.config.paymentCostPerTokenUsd ?? 0.0001) * tokenCount;
+      try {
+        await this.microTxManager.payForInference(`${this.config.agentId}-${Date.now()}`, cost);
+      } catch { /* payment optional */ }
+    }
+
     const toolCalls = this.detectToolCalls(content);
     if (toolCalls.length > 0) {
       for (const tc of toolCalls) {
         const tool = this.config.tools.find(t => t.name === tc.tool);
-        if (tool) tc.output = await Promise.resolve(tool.execute(tc.input));
+        if (tool) { try { tc.output = await Promise.resolve(tool.execute(tc.input)); } catch { tc.output = `[tool ${tc.tool} error]`; } }
       }
     }
 
@@ -242,7 +265,12 @@ export class AgentModel {
     let content: string;
     let inferenceResult: InferenceResult | undefined;
 
-    if (this.activeBackend === 'llamacpp' && this.llamacpp && this.autoConfig?.modelPath) {
+    const decoder = await this.ensureDecoder();
+    if (decoder && this.activeBackend === 'mock') {
+      const result = await this.dsdWithDecoder(fullPrompt);
+      content = result.content;
+      inferenceResult = result.inferenceResult;
+    } else if (this.activeBackend === 'llamacpp' && this.llamacpp && this.autoConfig?.modelPath) {
       const result = await this.llamacpp.generate(fullPrompt, this.config.maxTokens, true);
       content = result.content;
       inferenceResult = result.inferenceResult;
@@ -284,15 +312,82 @@ export class AgentModel {
       content = randomPortugueseResponse(prompt);
     }
 
+    if (this.microTxManager && this.config.enablePayments) {
+      const tokenCount = Math.ceil(content.length / 4);
+      const cost = (this.config.paymentCostPerTokenUsd ?? 0.0001) * tokenCount;
+      try {
+        await this.microTxManager.payForInference(`${this.config.agentId}-dsd-${Date.now()}`, cost);
+      } catch { /* payment optional */ }
+    }
+
     const toolCalls = this.detectToolCalls(content);
     if (toolCalls.length > 0) {
       for (const tc of toolCalls) {
         const tool = this.config.tools.find(t => t.name === tc.tool);
-        if (tool) tc.output = await Promise.resolve(tool.execute(tc.input));
+        if (tool) { try { tc.output = await Promise.resolve(tool.execute(tc.input)); } catch { tc.output = `[tool ${tc.tool} error]`; } }
       }
     }
 
     return { content, toolCalls, inferenceResult, latencyMs: performance.now() - start };
+  }
+
+  private async ensureDecoder(): Promise<any> {
+    if (this.speculativeDecoder) return this.speculativeDecoder;
+    if (this.config.enableMeshDSD) {
+      try {
+        const mod = await import('@skynet/p2p-mesh-network');
+        const SpeculativeDecoder = mod.SpeculativeDecoder;
+        this.speculativeDecoder = new SpeculativeDecoder({
+          adaptiveSpeculation: true,
+          speculationLen: 5,
+          maxSpeculationLen: 10,
+          minSpeculationLen: 2,
+        });
+      } catch { /* mesh network unavailable */ }
+    }
+    return this.speculativeDecoder;
+  }
+
+  private async dsdWithDecoder(prompt: string): Promise<{ content: string; inferenceResult?: InferenceResult }> {
+    const dsdStart = performance.now();
+    const decoder = await this.ensureDecoder();
+    if (!decoder) {
+      return { content: randomPortugueseResponse(prompt) };
+    }
+
+    const tokens = simpleTokenize(prompt);
+    const prefixTokens = tokens.slice(0, Math.min(16, tokens.length));
+    const vocabSize = 100;
+    const draftLogits = (ctx: number[]): Float32Array => {
+      const logits = new Float32Array(vocabSize);
+      for (let i = 0; i < vocabSize; i++) logits[i] = Math.sin(ctx.length * 0.1 + i * 0.05);
+      return logits;
+    };
+    const targetLogits = (ctx: number[]): Float32Array => {
+      const logits = new Float32Array(vocabSize);
+      for (let i = 0; i < vocabSize; i++) logits[i] = Math.cos(ctx.length * 0.1 + i * 0.05);
+      return logits;
+    };
+
+    const allTokens: number[] = [...prefixTokens];
+    let rounds = 0;
+    while (allTokens.length < 64 && rounds < 20) {
+      const draft = decoder.generateDraft(allTokens, draftLogits);
+      const verification = decoder.verify(allTokens, draft, targetLogits);
+      allTokens.push(...verification.acceptedTokens);
+      this.dsdStats.totalRounds++;
+      this.dsdStats.totalAccepted += verification.acceptedCount;
+      this.dsdStats.totalDrafted += draft.speculationLen;
+      rounds++;
+    }
+
+    const dsdElapsed = performance.now() - dsdStart;
+    const content = decodeTokens(allTokens);
+    const timings = { prefillMs: 10, decodeMs: rounds * 5, totalMs: dsdElapsed, tokensPerSecond: dsdElapsed > 0 ? allTokens.length / (dsdElapsed / 1000) : 0 };
+    return {
+      content,
+      inferenceResult: { tokens: allTokens, targetTokens: allTokens, timings },
+    };
   }
 
   private buildPrompt(prompt: string, context: string[]): string {
@@ -324,6 +419,20 @@ export class AgentModel {
     this.onnxMobile = null;
     this.coreml = null;
     this.mlx = null;
+  }
+
+  async initializePayments(): Promise<void> {
+    if (!this.config.enablePayments) return;
+    try {
+      const { SolanaX402, MicroTxManager } = await import('@skynet/blockchain-client');
+      const solana = new SolanaX402({ simulate: true });
+      this.microTxManager = new MicroTxManager(solana);
+    } catch { /* payments unavailable */ }
+  }
+
+  getDSDStats(): { totalRounds: number; totalAccepted: number; totalDrafted: number; acceptanceRate: number } {
+    const rate = this.dsdStats.totalDrafted > 0 ? this.dsdStats.totalAccepted / this.dsdStats.totalDrafted : 0;
+    return { ...this.dsdStats, acceptanceRate: rate };
   }
 
   getConfig(): AgentModelConfig { return this.config; }

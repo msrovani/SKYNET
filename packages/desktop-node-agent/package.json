@@ -26,6 +26,8 @@
     "@skynet/p2p-mesh-network": "workspace:*",
     "@skynet/tee-attestation-layer": "workspace:*",
     "@skynet/inference-runtime": "workspace:*",
+    "@skynet/blockchain-client": "workspace:*",
+    "@skynet/fl-training-client": "workspace:*",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/cli": "^2.0.0",
     "@tauri-apps/plugin-process": "^2.0.0",

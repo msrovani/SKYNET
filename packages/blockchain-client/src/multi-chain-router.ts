@@ -55,7 +55,7 @@ export class MultiChainRouter {
   }
 
   private emit(event: RouterEvent): void {
-    for (const cb of this.callbacks) cb(event);
+    for (const cb of this.callbacks) { try { cb(event); } catch { /* per ADR */ } }
   }
 
   registerAdapter(name: string, adapter: PolygonAdapter | ArbitrumAdapter): void {

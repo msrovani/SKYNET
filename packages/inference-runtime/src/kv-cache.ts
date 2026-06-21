@@ -152,3 +152,221 @@ export class KVCompress {
     return { compressed, metadata };
   }
 }
+
+export type QuantBitWidth = 2 | 4 | 8;
+
+export interface QuantizedKVCache {
+  keys: Uint8Array;
+  values: Uint8Array;
+  scaleK: Float32Array;
+  scaleV: Float32Array;
+  zeroPointK: Uint8Array;
+  zeroPointV: Uint8Array;
+  groupSize: number;
+  bitWidth: QuantBitWidth;
+  numTokens: number;
+  headDim: number;
+}
+
+export interface KVCacheQuantConfig {
+  bitWidth: QuantBitWidth;
+  groupSize: number;
+  useHadamard: boolean;
+}
+
+const HADAMARD_4: readonly number[][] = [
+  [1, 1, 1, 1],
+  [1, -1, 1, -1],
+  [1, 1, -1, -1],
+  [1, -1, -1, 1],
+];
+
+const DEFAULT_QUANT_CONFIG: KVCacheQuantConfig = {
+  bitWidth: 4,
+  groupSize: 64,
+  useHadamard: true,
+};
+
+function packBits(values: Uint8Array, bitWidth: QuantBitWidth): Uint8Array {
+  const valsPerByte = 8 / bitWidth;
+  const packedLen = Math.ceil(values.length / valsPerByte);
+  const packed = new Uint8Array(packedLen);
+  const mask = (1 << bitWidth) - 1;
+  for (let i = 0; i < values.length; i++) {
+    const pos = Math.floor(i / valsPerByte);
+    const shift = (i % valsPerByte) * bitWidth;
+    packed[pos] = (packed[pos] & ~(mask << shift)) | ((values[i] & mask) << shift);
+  }
+  return packed;
+}
+
+function unpackBits(packed: Uint8Array, numValues: number, bitWidth: QuantBitWidth): Uint8Array {
+  const valsPerByte = 8 / bitWidth;
+  const values = new Uint8Array(numValues);
+  const mask = (1 << bitWidth) - 1;
+  for (let i = 0; i < numValues; i++) {
+    const pos = Math.floor(i / valsPerByte);
+    const shift = (i % valsPerByte) * bitWidth;
+    values[i] = (packed[pos] >> shift) & mask;
+  }
+  return values;
+}
+
+function applyHadamard4(data: Float32Array): Float32Array {
+  const n = data.length;
+  const rounded = Math.floor(n / 4) * 4;
+  const out = new Float32Array(data);
+  for (let i = 0; i < rounded; i += 4) {
+    const a = out[i], b = out[i + 1], c = out[i + 2], d = out[i + 3];
+    const h0 = a * HADAMARD_4[0][0] + b * HADAMARD_4[0][1] + c * HADAMARD_4[0][2] + d * HADAMARD_4[0][3];
+    const h1 = a * HADAMARD_4[1][0] + b * HADAMARD_4[1][1] + c * HADAMARD_4[1][2] + d * HADAMARD_4[1][3];
+    const h2 = a * HADAMARD_4[2][0] + b * HADAMARD_4[2][1] + c * HADAMARD_4[2][2] + d * HADAMARD_4[2][3];
+    const h3 = a * HADAMARD_4[3][0] + b * HADAMARD_4[3][1] + c * HADAMARD_4[3][2] + d * HADAMARD_4[3][3];
+    out[i] = h0; out[i + 1] = h1; out[i + 2] = h2; out[i + 3] = h3;
+  }
+  return out;
+}
+
+function inverseHadamard4(data: Float32Array): Float32Array {
+  const n = data.length;
+  const rounded = Math.floor(n / 4) * 4;
+  const out = new Float32Array(data);
+  for (let i = 0; i < rounded; i += 4) {
+    const h0 = out[i], h1 = out[i + 1], h2 = out[i + 2], h3 = out[i + 3];
+    const a = (h0 + h1 + h2 + h3) / 4;
+    const b = (h0 - h1 + h2 - h3) / 4;
+    const c = (h0 + h1 - h2 - h3) / 4;
+    const d = (h0 - h1 - h2 + h3) / 4;
+    out[i] = a; out[i + 1] = b; out[i + 2] = c; out[i + 3] = d;
+  }
+  return out;
+}
+
+export class KVCacheQuantizer {
+  private config: KVCacheQuantConfig;
+
+  constructor(config: Partial<KVCacheQuantConfig> = {}) {
+    this.config = { ...DEFAULT_QUANT_CONFIG, ...config };
+  }
+
+  setConfig(cfg: Partial<KVCacheQuantConfig>): void {
+    this.config = { ...this.config, ...cfg };
+  }
+
+  getConfig(): KVCacheQuantConfig {
+    return { ...this.config };
+  }
+
+  quantizeKV(keyCache: Float32Array, valueCache: Float32Array, headDim: number = 1): QuantizedKVCache {
+    const numTokens = Math.floor(keyCache.length / headDim);
+    const { bitWidth, groupSize, useHadamard } = this.config;
+    const maxVal = (1 << bitWidth) - 1;
+
+    const process = (data: Float32Array): { quantized: Uint8Array; scales: Float32Array; zeroPoints: Uint8Array } => {
+      const n = data.length;
+      const numGroups = Math.ceil(n / groupSize);
+      const scales = new Float32Array(numGroups);
+      const zeroPoints = new Uint8Array(numGroups);
+      const quantizedFloat = new Float32Array(n);
+      let processed = data;
+      if (useHadamard) processed = applyHadamard4(data);
+
+      for (let g = 0; g < numGroups; g++) {
+        const start = g * groupSize;
+        const end = Math.min(start + groupSize, n);
+        let minVal = Infinity;
+        let maxValLocal = -Infinity;
+        for (let i = start; i < end; i++) {
+          const v = processed[i];
+          if (v < minVal) minVal = v;
+          if (v > maxValLocal) maxValLocal = v;
+        }
+        const range = maxValLocal - minVal;
+        if (range < 1e-10) {
+          scales[g] = 1;
+          zeroPoints[g] = 0;
+          for (let i = start; i < end; i++) quantizedFloat[i] = 0;
+        } else {
+          const scale = range / maxVal;
+          scales[g] = scale;
+          const zp = Math.round(-minVal / scale);
+          zeroPoints[g] = Math.min(maxVal, Math.max(0, zp));
+          for (let i = start; i < end; i++) {
+            const q = Math.round(processed[i] / scale + zeroPoints[g]);
+            quantizedFloat[i] = Math.min(maxVal, Math.max(0, q));
+          }
+        }
+      }
+      const quantizedU8 = new Uint8Array(n);
+      for (let i = 0; i < n; i++) quantizedU8[i] = Math.round(quantizedFloat[i]);
+      const packed = packBits(quantizedU8, bitWidth);
+      return { quantized: packed, scales, zeroPoints };
+    };
+
+    const kResult = process(keyCache);
+    const vResult = process(valueCache);
+
+    return {
+      keys: kResult.quantized,
+      values: vResult.quantized,
+      scaleK: kResult.scales,
+      scaleV: vResult.scales,
+      zeroPointK: kResult.zeroPoints,
+      zeroPointV: vResult.zeroPoints,
+      groupSize,
+      bitWidth,
+      numTokens,
+      headDim,
+    };
+  }
+
+  dequantizeKV(quantized: QuantizedKVCache): { keys: Float32Array; values: Float32Array } {
+    const { keys, values, scaleK, scaleV, zeroPointK, zeroPointV, groupSize, bitWidth, numTokens, headDim } = quantized;
+    const totalElements = numTokens * headDim;
+
+    const dequantize = (packed: Uint8Array, scales: Float32Array, zeroPoints: Uint8Array): Float32Array => {
+      const unpacked = unpackBits(packed, totalElements, bitWidth);
+      const result = new Float32Array(totalElements);
+      const numGroups = Math.ceil(totalElements / groupSize);
+      for (let g = 0; g < numGroups; g++) {
+        const start = g * groupSize;
+        const end = Math.min(start + groupSize, totalElements);
+        for (let i = start; i < end; i++) {
+          const dq = (unpacked[i] - zeroPoints[g]) * scales[g];
+          result[i] = dq;
+        }
+      }
+      if (this.config.useHadamard) return inverseHadamard4(result);
+      return result;
+    };
+
+    return {
+      keys: dequantize(keys, scaleK, zeroPointK),
+      values: dequantize(values, scaleV, zeroPointV),
+    };
+  }
+
+  compressKVCache(keys: Float32Array, values: Float32Array): { compressed: QuantizedKVCache } {
+    const quantized = this.quantizeKV(keys, values, 1);
+    return { compressed: quantized };
+  }
+
+  compressionRatio(bitWidth: QuantBitWidth): number {
+    return 32 / bitWidth;
+  }
+
+  estimateMemoryUsage(numTokens: number, headDim: number): { fp32Bytes: number; quantizedBytes: number; ratio: number } {
+    const elements = numTokens * headDim;
+    const fp32Bytes = 2 * elements * 4;
+    const bitsPerElement = this.config.bitWidth;
+    const quantBytes = 2 * Math.ceil(elements * bitsPerElement / 8);
+    const scaleBytes = 2 * Math.ceil(elements / this.config.groupSize) * 4;
+    const zpBytes = 2 * Math.ceil(elements / this.config.groupSize) * 1;
+    const totalQuantBytes = quantBytes + scaleBytes + zpBytes;
+    return {
+      fp32Bytes,
+      quantizedBytes: totalQuantBytes,
+      ratio: fp32Bytes / Math.max(1, totalQuantBytes),
+    };
+  }
+}

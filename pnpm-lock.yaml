@@ -98,6 +98,12 @@ importers:
         specifier: workspace:*
         version: link:../core-wasm-engine
     devDependencies:
+      '@skynet/blockchain-client':
+        specifier: workspace:*
+        version: link:../blockchain-client
+      '@skynet/fl-training-client':
+        specifier: workspace:*
+        version: link:../fl-training-client
       '@skynet/inference-runtime':
         specifier: workspace:*
         version: link:../inference-runtime
@@ -136,6 +142,13 @@ importers:
         version: 1.6.1(@types/node@25.9.2)(terser@5.48.0)
 
   packages/fl-training-client:
+    dependencies:
+      '@skynet/blockchain-client':
+        specifier: workspace:*
+        version: link:../blockchain-client
+      '@skynet/p2p-mesh-network':
+        specifier: workspace:*
+        version: link:../p2p-mesh-network
     devDependencies:
       eslint:
         specifier: ^8.57.0
@@ -149,6 +162,12 @@ importers:
 
   packages/inference-runtime:
     dependencies:
+      '@skynet/blockchain-client':
+        specifier: workspace:*
+        version: link:../blockchain-client
+      '@skynet/p2p-mesh-network':
+        specifier: workspace:*
+        version: link:../p2p-mesh-network
       node-llama-cpp:
         specifier: ^3.18.1
         version: 3.18.1(typescript@5.9.3)

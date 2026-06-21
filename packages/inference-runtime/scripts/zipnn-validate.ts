@@ -38,7 +38,7 @@ class ZipNNTest {
       if (data[i] > max) max = data[i];
     }
     const range = max - min || 1;
-    const qMax = (1 << this.config.quantBits) - 1;
+    const qMax = ({ 2: 3, 4: 15, 8: 255 } as Record<number, number>)[this.config.quantBits] ?? 255;
 
     const hdr = 36;
     const buf = new Uint8Array(hdr + n * 2);

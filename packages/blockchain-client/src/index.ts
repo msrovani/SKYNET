@@ -23,8 +23,11 @@ export {
 
 export {
   MicroTxManager,
+  StreamingPayment, TAPStream, MPPStreaming,
   type TxResult,
   type BatchPayment,
+  type TokenCommitment,
+  type MPPSubscription,
 } from './microtx.js';
 
 export {
@@ -36,7 +39,9 @@ export {
 
 export {
   PolygonAdapter, ArbitrumAdapter,
+  generateReference,
   type ChainConfig, type ChainQuote, type ChainReceipt,
+  type TransactionSigner,
 } from './chain-adapters.js';
 export {
   MultiChainRouter,
@@ -49,6 +54,7 @@ export {
   UptoAuthorizer,
   signSettlementMessage,
   verifySettlementMessage,
+  constructSettlementMessage,
   type SettlementMetadata,
   type SettlementEntry,
   type UptoAuthorization,

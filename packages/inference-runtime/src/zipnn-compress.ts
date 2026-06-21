@@ -1,7 +1,9 @@
+export type QuantBitWidth = 2 | 4 | 8;
+
 export interface ZipNNConfig {
   blockSize: number;
-  quantBits: number;
-  compressionLevel: number;
+  quantBits: QuantBitWidth;
+  compressionLevel: 1 | 2 | 3;
   entropyCoder: 'huffman' | 'arithmetic';
 }
 
@@ -70,6 +72,9 @@ export class ZipNNCompressor {
   }
 
   async compress(data: Float32Array): Promise<ZipNNResult> {
+    if (data.length === 0) {
+      return { compressedData: new Uint8Array(36), originalSize: 0, compressedSize: 36, compressionRatio: 1, metadata: { blockSize: this.config.blockSize, quantBits: this.config.quantBits, entropyCoder: this.config.entropyCoder, originalShape: [], originalDtype: 'f32' } };
+    }
     const originalSize = data.length * 4;
     const quantizer = new Quantizer(this.config.quantBits);
     const quantized = quantizer.quantize(data);
@@ -135,6 +140,8 @@ export class ZipNNCompressor {
   }
 }
 
+const MAX_QUANT_LOOKUP: Record<number, number> = { 2: 3, 4: 15, 8: 255 };
+
 class Quantizer {
   private quantBits: number;
 
@@ -143,10 +150,11 @@ class Quantizer {
   }
 
   quantize(data: Float32Array): Uint32Array {
+    if (data.length === 0) return new Uint32Array(0);
     const min = Math.min(...data);
     const max = Math.max(...data);
     const range = max - min;
-    const maxQuant = (1 << this.quantBits) - 1;
+    const maxQuant = MAX_QUANT_LOOKUP[this.quantBits] ?? 255;
     const scale = range < 1e-10 ? 1 : range / maxQuant;
 
     const quantized = new Uint32Array(data.length);
@@ -171,7 +179,7 @@ class Dequantizer {
   }
 
   dequantize(quantized: Uint32Array): Float32Array {
-    const maxQuant = (1 << this.quantBits) - 1;
+    const maxQuant = MAX_QUANT_LOOKUP[this.quantBits] ?? 255;
     const range = this.maxValue - this.minValue;
     const scale = range < 1e-10 ? 1 : range / maxQuant;
     const dequantized = new Float32Array(quantized.length);

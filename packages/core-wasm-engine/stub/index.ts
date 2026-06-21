@@ -119,7 +119,7 @@ export function quantizeInt4(data: Float32Array): Uint8Array {
     const v1 = i + 1 < data.length
       ? Math.max(0, Math.min(15, Math.round((data[i + 1] + 8) / 16 * 15)))
       : 0;
-    out[i >> 1] = (v0 << 4) | v1;
+    out[i >> 1] = (v1 << 4) | v0;
   }
   return out;
 }
@@ -127,10 +127,10 @@ export function quantizeInt4(data: Float32Array): Uint8Array {
 export function dequantizeInt4(data: Uint8Array): Float32Array {
   const out = new Float32Array(data.length * 2);
   for (let i = 0; i < data.length; i++) {
-    const hi = (data[i] >> 4) & 0xf;
     const lo = data[i] & 0xf;
-    out[i * 2] = (hi / 15) * 16 - 8;
-    out[i * 2 + 1] = (lo / 15) * 16 - 8;
+    const hi = (data[i] >> 4) & 0xf;
+    out[i * 2] = (lo / 15) * 16 - 8;
+    out[i * 2 + 1] = (hi / 15) * 16 - 8;
   }
   return out;
 }
@@ -297,6 +297,7 @@ export function shardTensorRowwise(
   if (wasmModule) {
     return wasmModule.shard_tensor_rowwise(tensorId, data, rows, cols, numShards);
   }
+  if (numShards === 0) return [];
   const rowsPerShard = Math.ceil(rows / numShards);
   const shards: TensorShard[] = [];
   for (let i = 0; i < numShards; i++) {
@@ -331,6 +332,7 @@ export function shardTensorColwise(
   if (wasmModule) {
     return wasmModule.shard_tensor_colwise(tensorId, data, rows, cols, numShards);
   }
+  if (numShards === 0) return [];
   const colsPerShard = Math.ceil(cols / numShards);
   const shards: TensorShard[] = [];
   for (let i = 0; i < numShards; i++) {
@@ -363,6 +365,7 @@ export function reconstructTensor(shards: TensorShard[], originalRows: number, o
   if (wasmModule) {
     return wasmModule.reconstruct_tensor(shards, originalRows, originalCols);
   }
+  if (shards.length === 0) throw new Error('Empty shards array');
   const isRowwise = shards[0].metadata.rowEnd - shards[0].metadata.rowStart > 0
     && shards[0].metadata.colEnd - shards[0].metadata.colStart === originalCols;
   const result = new Float32Array(originalRows * originalCols);
@@ -469,6 +472,7 @@ export function buildPipelinePlan(config: TransformerConfig, hostIds: string[]):
     return wasmModule.build_pipeline_plan(config, hostIds);
   }
   const numHosts = hostIds.length;
+  if (numHosts === 0) return { config, layerAssignments: [], numHosts: 0 };
   const layerAssignments: PipelineLayerAssignment[] = [];
   for (let i = 0; i < config.numLayers; i++) {
     layerAssignments.push({ layerIdx: i, hostId: hostIds[i % numHosts], shardIdx: 0, totalShards: 1 });
@@ -481,6 +485,7 @@ export function buildShardedPipelinePlan(config: TransformerConfig, hostIds: str
     return wasmModule.build_sharded_pipeline_plan(config, hostIds, shardsPerLayer);
   }
   const numHosts = hostIds.length;
+  if (numHosts === 0) return { config, layerAssignments: [], numHosts: 0 };
   const layerAssignments: PipelineLayerAssignment[] = [];
   for (let i = 0; i < config.numLayers; i++) {
     for (let s = 0; s < shardsPerLayer; s++) {

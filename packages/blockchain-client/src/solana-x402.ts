@@ -113,7 +113,7 @@ export class SolanaX402 {
       maxRetries: config.maxRetries ?? 3,
       simulate: config.simulate ?? true,
     };
-    this.signerSecretKey = (config as any).signerSecretKey;
+    this.signerSecretKey = config.signerSecretKey;
     this.connection = new Connection(this.config.endpoint);
     this.x402V2Config = {
       endpoint: this.config.endpoint,
@@ -251,8 +251,8 @@ export class SolanaX402 {
     const state: ChannelState = {
       channelId,
       peer,
-      capacity: capacitySol * LAMPORTS_PER_SOL,
-      balanceLocal: capacitySol * LAMPORTS_PER_SOL,
+      capacity: Math.round(capacitySol * LAMPORTS_PER_SOL),
+      balanceLocal: Math.round(capacitySol * LAMPORTS_PER_SOL),
       balanceRemote: 0,
       nonce: 0,
       expiresAt: Date.now() + durationMin * 60 * 1000,
@@ -287,7 +287,7 @@ export class SolanaX402 {
   }
 
   async verifyChannelClaim(claim: ChannelPaymentClaim, serverPubkey: string, publicKey: Uint8Array): Promise<boolean> {
-    if (this.settlementCache.isDuplicate(claim.channelId, parseInt(claim.nonce))) {
+    if (this.settlementCache.isDuplicate(claim.channelId, Number(claim.nonce))) {
       return false;
     }
     const claimAmount = BigInt(claim.amount);
@@ -303,7 +303,7 @@ export class SolanaX402 {
     try {
       const valid = nacl.sign.detached.verify(message, sigBytes, publicKey);
       if (valid) {
-        this.settlementCache.markSettled(claim.channelId, parseInt(claim.nonce), parseInt(claim.amount));
+        this.settlementCache.markSettled(claim.channelId, Number(claim.nonce), Number(claim.amount));
       }
       return valid;
     } catch {
@@ -350,11 +350,13 @@ export class SolanaX402 {
   ): Uint8Array {
     const message = Buffer.alloc(109);
     let offset = 0;
+    const channelPadded = channelId.padEnd(32, '\0').slice(0, 32);
+    const serverPadded = server.padEnd(32, '\0').slice(0, 32);
     Buffer.from(X402_CONSTRUCTED_MESSAGE_DOMAIN, 'utf-8').copy(message, offset);
     offset += 21;
-    Buffer.from(channelId, 'utf-8').copy(message, offset);
+    Buffer.from(channelPadded, 'utf-8').copy(message, offset);
     offset += 32;
-    Buffer.from(server, 'utf-8').copy(message, offset);
+    Buffer.from(serverPadded, 'utf-8').copy(message, offset);
     offset += 32;
     message.writeBigUInt64LE(amount, offset);
     offset += 8;

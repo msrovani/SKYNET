@@ -91,7 +91,16 @@ export class ZkFlVerifier {
     originalUpdates: number[][],
   ): Promise<ZkVerificationResult[]> {
     return Promise.all(
-      proofs.map((proof, i) => this.verifyProof(proof, originalUpdates[i] ?? [])),
+      proofs.map((proof, i) =>
+        this.verifyProof(proof, originalUpdates[i] ?? []).catch((err) => ({
+          verified: false,
+          timestamp: Date.now(),
+          clientId: proof.clientId,
+          globalStep: proof.globalStep,
+          verificationTimeMs: 0,
+          reason: err instanceof Error ? err.message : 'Verification failed',
+        })),
+      ),
     );
   }
 

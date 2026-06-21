@@ -152,3 +152,103 @@ describe('SpeculativeDecoder', () => {
     expect(result.rejectionPosition).toBe(1);
   });
 });
+
+describe('TreeSpecDecoder', () => {
+  it('builds draft tree with correct structure', async () => {
+    const { TreeSpecDecoder } = await import('../speculative-decoding.js');
+    const decoder = new TreeSpecDecoder({ maxNodes: 10, topK: 3, branchFactor: 2, maxDepth: 4 });
+    const mockDraftLogits = (_prefix: number[]) => {
+      const arr = new Float32Array(5);
+      arr[0] = 10; arr[1] = 9; arr[2] = 8;
+      return arr;
+    };
+    const tree = decoder.buildDraftTree(mockDraftLogits, [1, 2]);
+    expect(tree.token).toBe(-1);
+    expect(tree.depth).toBe(0);
+    expect(tree.children.length).toBeGreaterThanOrEqual(1);
+    expect(tree.children.length).toBeLessThanOrEqual(2);
+    const paths = decoder.flattenTree(tree);
+    expect(paths.length).toBeGreaterThanOrEqual(1);
+    expect(paths[0].length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('flattenTree returns all leaf paths', async () => {
+    const { TreeSpecDecoder } = await import('../speculative-decoding.js');
+    const decoder = new TreeSpecDecoder({ maxNodes: 6, topK: 2, branchFactor: 2, maxDepth: 3 });
+    const mockLogits = () => {
+      const arr = new Float32Array(5);
+      arr[0] = 10; arr[1] = 8;
+      return arr;
+    };
+    const tree = decoder.buildDraftTree(mockLogits, []);
+    const paths = decoder.flattenTree(tree);
+    expect(paths.length).toBeGreaterThanOrEqual(1);
+    for (const p of paths) expect(p.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('verifyTree accepts tokens with target-like distribution', async () => {
+    const { TreeSpecDecoder } = await import('../speculative-decoding.js');
+    const decoder = new TreeSpecDecoder({ maxNodes: 5, topK: 2, branchFactor: 2, maxDepth: 3, acceptanceThreshold: 0.9 });
+    const draftLogits = () => {
+      const arr = new Float32Array(5);
+      arr[0] = 10; arr[1] = 9; arr[2] = 2;
+      return arr;
+    };
+    const targetLogits = () => {
+      const arr = new Float32Array(5);
+      arr[0] = 10; arr[1] = 8; arr[2] = 3;
+      return arr;
+    };
+    const tree = decoder.buildDraftTree(draftLogits, [0]);
+    expect(tree.children.length).toBeGreaterThanOrEqual(1);
+    const result = decoder.verifyTree([0], tree, targetLogits);
+    expect(result.acceptedCount).toBeGreaterThanOrEqual(0);
+    expect(result.acceptedTokens.length).toBe(result.acceptedCount);
+  });
+
+  it('accepts tokens along best path when draft matches target', async () => {
+    const { TreeSpecDecoder } = await import('../speculative-decoding.js');
+    const decoder = new TreeSpecDecoder({ maxNodes: 4, topK: 1, branchFactor: 1, maxDepth: 3, acceptanceThreshold: 1.0 });
+    const logits = () => {
+      const arr = new Float32Array(5);
+      arr[0] = 100; arr[1] = 1; arr[2] = 1;
+      return arr;
+    };
+    const tree = decoder.buildDraftTree(logits, [0]);
+    expect(tree.children.length).toBe(1);
+    expect(tree.children[0].token).toBe(0);
+    const result = decoder.verifyTree([0], tree, logits);
+    expect(result.acceptedCount).toBeGreaterThan(0);
+  });
+
+  it('adaptive budget scales with acceptance rate', async () => {
+    const { TreeSpecDecoder } = await import('../speculative-decoding.js');
+    const decoder = new TreeSpecDecoder({ maxNodes: 20, topK: 3, branchFactor: 3, maxDepth: 5, useAdaptiveBudget: true });
+    const logits = () => {
+      const arr = new Float32Array(10);
+      arr[0] = 10; arr[1] = 9; arr[2] = 8;
+      return arr;
+    };
+    const tree = decoder.buildDraftTree(logits, [1]);
+    expect(tree.children.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('resetStats clears statistics', async () => {
+    const { TreeSpecDecoder } = await import('../speculative-decoding.js');
+    const decoder = new TreeSpecDecoder();
+    decoder.resetStats();
+    const stats = decoder.getStats();
+    expect(stats.totalRounds).toBe(0);
+    expect(stats.totalNodes).toBe(0);
+    expect(stats.totalAccepted).toBe(0);
+  });
+
+  it('updateConfig changes parameters', async () => {
+    const { TreeSpecDecoder } = await import('../speculative-decoding.js');
+    const decoder = new TreeSpecDecoder({ maxNodes: 10 });
+    decoder.updateConfig({ maxNodes: 20, acceptanceThreshold: 0.95 });
+    const cfg = decoder.getConfig();
+    expect(cfg.maxNodes).toBe(20);
+    expect(cfg.acceptanceThreshold).toBe(0.95);
+  });
+});

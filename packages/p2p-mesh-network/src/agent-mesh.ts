@@ -23,7 +23,7 @@ export interface AgentHealth {
 
 export type MeshManagerEvent = 'agent_online' | 'agent_offline' | 'agent_degraded' | 'mesh_connected' | 'mesh_disconnected' | 'task_assigned';
 
-export type MeshManagerCallback = (event: MeshManagerEvent, data: any) => void;
+export type MeshManagerCallback = (event: MeshManagerEvent, data: unknown) => void;
 
 export class AgentMeshManager {
   private router: SemanticRouter;
@@ -163,6 +163,10 @@ export class AgentMeshManager {
   }
 
   startMonitoring(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
     this.meshConnected = true;
     this.emit('mesh_connected', { nodeId: this.localNodeId });
 
@@ -176,6 +180,7 @@ export class AgentMeshManager {
             health.status = 'offline';
             this.router.unregisterAgent(agentId);
             this.emit('agent_offline', { agentId, nodeId: health.nodeId, reason: 'missed_heartbeats' });
+            this.health.delete(agentId);
           } else {
             health.status = 'degraded';
             this.emit('agent_degraded', { agentId, nodeId: health.nodeId, missedHeartbeats: health.missedHeartbeats });

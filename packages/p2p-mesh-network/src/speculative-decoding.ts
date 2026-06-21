@@ -89,7 +89,7 @@ export class SpeculativeDecoder {
   }
 
   private emit(event: DecodingEvent): void {
-    for (const cb of this.callbacks) cb(event);
+    for (const cb of this.callbacks) { try { cb(event); } catch { /* per ADR */ } }
   }
 
   updateConfig(config: Partial<SpeculativeConfig>): void {
@@ -288,9 +288,7 @@ export class SpeculativeDecoder {
     draftProb: Float32Array,
     partialTargetLogits: Float32Array,
   ): { accepted: boolean; resampled?: number } {
-    const pTarget = partialTargetLogits[draftToken] >= 0
-      ? this.softmax(partialTargetLogits)[draftToken]
-      : 0;
+    const pTarget = this.softmax(partialTargetLogits)[draftToken];
     const pDraft = draftProb[draftToken];
     const ratio = pDraft > 1e-8 ? Math.min(pTarget / pDraft, 10) : 0;
     if (this.nextRandom() < Math.min(1, ratio * this.config.acceptanceThreshold)) {
@@ -431,10 +429,10 @@ export class SpeculativeDecoder {
     for (let i = 0; i < draft.speculationLen; i++) {
       const predictedAccept = this.lightVerifier.predict(draft.probabilities[i]);
       if (predictedAccept > 0.5) {
+        const logits = targetLogits(context);
+        targetProbs.push(this.softmax(logits));
         acceptedTokens.push(draft.tokens[i]);
         context.push(draft.tokens[i]);
-          const logits = targetLogits(context);
-          targetProbs.push(this.softmax(logits));
       } else {
         const logits = targetLogits(context);
         const probs = this.softmax(logits);
@@ -467,6 +465,7 @@ export class SpeculativeDecoder {
     this.stats.totalRounds++;
     this.stats.acceptanceRate = this.stats.totalAcceptedTokens / Math.max(this.stats.totalDraftTokens, 1);
     this.stats.averageAcceptedPerRound = this.stats.totalAcceptedTokens / Math.max(this.stats.totalRounds, 1);
+    this.stats.speedupRatio = Math.max(0, this.stats.averageAcceptedPerRound - 1);
 
     return { acceptedTokens, acceptedCount: acceptedTokens.length, rejectionPosition: rejectionPos, resampledToken: resampled, targetProbabilities: targetProbs };
   }
@@ -484,6 +483,7 @@ export class SpeculativeDecoder {
   }
 
   private sample(probs: Float32Array): number {
+    if (probs.length === 0) return 0;
     const r = this.nextRandom();
     let cumSum = 0;
     for (let i = 0; i < probs.length; i++) {
@@ -491,6 +491,208 @@ export class SpeculativeDecoder {
       if (r < cumSum) return i;
     }
     return probs.length - 1;
+  }
+}
+
+export interface TreeNode {
+  token: number;
+  probability: number;
+  depth: number;
+  children: TreeNode[];
+  parent: TreeNode | null;
+}
+
+export interface TreeSpecConfig {
+  maxNodes: number;
+  topK: number;
+  branchFactor: number;
+  maxDepth: number;
+  acceptanceThreshold: number;
+  useAdaptiveBudget: boolean;
+}
+
+const TREE_SPEC_DEFAULT: TreeSpecConfig = {
+  maxNodes: 16,
+  topK: 5,
+  branchFactor: 3,
+  maxDepth: 6,
+  acceptanceThreshold: 0.9,
+  useAdaptiveBudget: true,
+};
+
+export class TreeSpecDecoder {
+  private config: TreeSpecConfig;
+  private rngState: number;
+  private stats = { totalNodes: 0, totalAccepted: 0, totalRounds: 0, acceptanceRate: 0, averageAcceptedPerRound: 0 };
+
+  constructor(config: Partial<TreeSpecConfig> = {}) {
+    this.config = { ...TREE_SPEC_DEFAULT, ...config };
+    this.rngState = Date.now() & 0x7fffffff;
+  }
+
+  updateConfig(cfg: Partial<TreeSpecConfig>): void {
+    this.config = { ...this.config, ...cfg };
+  }
+
+  getConfig(): TreeSpecConfig {
+    return { ...this.config };
+  }
+
+  private softmax(logits: Float32Array): Float32Array {
+    const max = logits.length > 0 ? Math.max(...Array.from(logits)) : 0;
+    let sum = 0;
+    const result = new Float32Array(logits.length);
+    for (let i = 0; i < logits.length; i++) {
+      result[i] = Math.exp(logits[i] - max);
+      sum += result[i];
+    }
+    if (sum > 0) for (let i = 0; i < result.length; i++) result[i] /= sum;
+    return result;
+  }
+
+  buildDraftTree(draftLogits: (prefix: number[]) => Float32Array, prefixTokens: number[]): TreeNode {
+    const root: TreeNode = { token: -1, probability: 1, depth: 0, children: [], parent: null };
+    let nodeCount = 1;
+    const maxNodes = this.config.useAdaptiveBudget
+      ? Math.min(this.config.maxNodes * 2, Math.max(this.config.maxNodes, Math.floor(this.config.maxNodes * (1 + this.stats.acceptanceRate))))
+      : this.config.maxNodes;
+
+    const leaves: TreeNode[] = [root];
+
+    while (nodeCount < maxNodes && leaves.length > 0) {
+      const leaf = leaves.shift()!;
+      if (leaf.depth >= this.config.maxDepth) continue;
+
+      const context = [...prefixTokens];
+      const path: number[] = [];
+      let cursor: TreeNode | null = leaf;
+      while (cursor && cursor.parent) {
+        path.unshift(cursor.token);
+        cursor = cursor.parent;
+      }
+      context.push(...path);
+
+      const logits = draftLogits(context);
+      const probs = this.softmax(logits);
+      const topK = Math.min(this.config.topK, probs.length);
+      const arr: number[] = [];
+      for (let i = 0; i < probs.length; i++) arr.push(probs[i]);
+      const indexed: Array<{ value: number; index: number }> = arr
+        .map((v, i) => ({ value: v, index: i }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, topK);
+
+      const branchCount = Math.min(
+        this.config.branchFactor,
+        maxNodes - nodeCount,
+        topK,
+        indexed.filter(x => x.value > 0.01).length || 1,
+      );
+
+      for (let i = 0; i < branchCount && nodeCount < maxNodes; i++) {
+        const child: TreeNode = {
+          token: indexed[i].index,
+          probability: indexed[i].value,
+          depth: leaf.depth + 1,
+          children: [],
+          parent: leaf,
+        };
+        leaf.children.push(child);
+        leaves.push(child);
+        nodeCount++;
+      }
+    }
+
+    return root;
+  }
+
+  flattenTree(root: TreeNode): number[][] {
+    const paths: number[][] = [];
+    const traverse = (node: TreeNode, path: number[]) => {
+      if (node.children.length === 0 && node.parent !== null) {
+        paths.push([...path]);
+        return;
+      }
+      for (const child of node.children) {
+        traverse(child, [...path, child.token]);
+      }
+    };
+    traverse(root, []);
+    return paths;
+  }
+
+  verifyTree(
+    prefixTokens: number[],
+    root: TreeNode,
+    targetLogits: (prefix: number[]) => Float32Array,
+  ): { acceptedTokens: number[]; acceptancePath: number[]; acceptedCount: number } {
+    const paths = this.flattenTree(root);
+    let bestPath: number[] = [];
+    let bestAccepted = 0;
+    let bestTokens: number[] = [];
+
+    for (const path of paths) {
+      const rngSnapshot = this.rngState;
+      const context = [...prefixTokens];
+      const accepted: number[] = [];
+      for (let i = 0; i < path.length; i++) {
+        const logits = targetLogits(context);
+        const probs = this.softmax(logits);
+        const pTarget = probs[path[i]];
+        const pDraft = this.getDraftProbability(root, path.slice(0, i + 1));
+        const ratio = pDraft > 1e-8 ? Math.min(pTarget / pDraft, 10) : 0;
+        const r = this.nextRandom();
+        if (r < Math.min(1, ratio * this.config.acceptanceThreshold)) {
+          accepted.push(path[i]);
+          context.push(path[i]);
+        } else {
+          break;
+        }
+      }
+      this.rngState = rngSnapshot;
+      if (accepted.length > bestAccepted) {
+        bestAccepted = accepted.length;
+        bestPath = path;
+        bestTokens = accepted;
+      }
+    }
+
+    this.stats.totalNodes += this.countNodes(root);
+    this.stats.totalAccepted += bestAccepted;
+    this.stats.totalRounds++;
+    this.stats.acceptanceRate = this.stats.totalAccepted / Math.max(this.stats.totalNodes, 1);
+    this.stats.averageAcceptedPerRound = this.stats.totalAccepted / Math.max(this.stats.totalRounds, 1);
+
+    return { acceptedTokens: bestTokens, acceptancePath: bestPath, acceptedCount: bestAccepted };
+  }
+
+  private getDraftProbability(root: TreeNode, tokens: number[]): number {
+    let node = root;
+    for (const t of tokens) {
+      const child = node.children.find(c => c.token === t);
+      if (!child) return 0;
+      node = child;
+    }
+    return node.probability;
+  }
+
+  private countNodes(node: TreeNode): number {
+    let count = 1;
+    for (const child of node.children) count += this.countNodes(child);
+    return count;
+  }
+
+  private nextRandom(): number {
+    this.rngState = (this.rngState * 1103515245 + 12345) & 0x7fffffff;
+    return this.rngState / 0x7fffffff;
+  }
+
+  getStats(): typeof this.stats {
+    return { ...this.stats };
+  }
+
+  resetStats(): void {
+    this.stats = { totalNodes: 0, totalAccepted: 0, totalRounds: 0, acceptanceRate: 0, averageAcceptedPerRound: 0 };
   }
 }
 
@@ -558,18 +760,18 @@ export class LightweightVerifier {
       }
       const dz1 = pred - target;
       const dz0 = (1 - pred) - (1 - target);
-      this.b2[0] -= lr * dz0;
-      this.b2[1] -= lr * dz1;
-      for (let i = 0; i < this.hiddenDim; i++) {
-        this.w2[i * 2] -= lr * dz0 * h[i];
-        this.w2[i * 2 + 1] -= lr * dz1 * h[i];
-      }
       for (let i = 0; i < this.hiddenDim; i++) {
         const dh = (dz0 * this.w2[i * 2] + dz1 * this.w2[i * 2 + 1]) * (preH[i] > 0 ? 1 : 0);
         this.b1[i] -= lr * dh;
         for (let j = 0; j < 10; j++) {
           this.w1[j * this.hiddenDim + i] -= lr * dh * input[j];
         }
+      }
+      this.b2[0] -= lr * dz0;
+      this.b2[1] -= lr * dz1;
+      for (let i = 0; i < this.hiddenDim; i++) {
+        this.w2[i * 2] -= lr * dz0 * h[i];
+        this.w2[i * 2 + 1] -= lr * dz1 * h[i];
       }
     }
   }

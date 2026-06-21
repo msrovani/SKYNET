@@ -94,7 +94,7 @@ export class CrdtSync {
     this.doc = Automerge.change(this.doc, (doc: any) => {
       if (doc.peers) delete doc.peers[peerId];
       if (doc.tasks) {
-        for (const task of Object.values(doc.tasks) as any[]) {
+        for (const task of Object.values(doc.tasks) as { assignedTo: string; status: string }[]) {
           if (task.assignedTo === peerId) {
             task.status = 'pending';
             task.assignedTo = '';
@@ -127,7 +127,7 @@ export class CrdtSync {
         id, r: peer.role, s: peer.score, t: peer.thermalHeadroom,
       })),
       l: state.l3Leader,
-      tc: Object.values(state.tasks || {}).filter((t: any) => t.status === 'running').length,
+      tc: Object.values(state.tasks || {}).filter((t: { status: string }) => t.status === 'running').length,
     };
     return new TextEncoder().encode(JSON.stringify(summary));
   }
@@ -136,11 +136,11 @@ export class CrdtSync {
     const summary = JSON.parse(new TextDecoder().decode(data));
     if (summary.p) {
       for (const p of summary.p) {
-        const peerUpdate: Record<string, any> = {};
+        const peerUpdate: Partial<PeerState> = {};
         if (p.r != null) peerUpdate.role = p.r;
         if (p.s != null) peerUpdate.score = p.s;
         if (p.t != null) peerUpdate.thermalHeadroom = p.t;
-        this.updatePeer(p.id, peerUpdate as any);
+        this.updatePeer(p.id, peerUpdate);
       }
     }
     if (summary.l) this.setL3Leader(summary.l);

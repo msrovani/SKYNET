@@ -70,9 +70,25 @@ export class ModelLoader {
     this.cache.clear();
   }
 
+  private loadingPromises = new Map<string, Promise<ArrayBuffer>>();
+
   async load(config: ModelConfig, onProgress?: ProgressCallback): Promise<ArrayBuffer> {
     const cached = this.cache.get(config.id);
     if (cached) return cached;
+    const existing = this.loadingPromises.get(config.id);
+    if (existing) return existing;
+    const promise = this.doDownload(config, onProgress);
+    this.loadingPromises.set(config.id, promise);
+    try {
+      const result = await promise;
+      this.cache.set(config.id, result);
+      return result;
+    } finally {
+      this.loadingPromises.delete(config.id);
+    }
+  }
+
+  private async doDownload(config: ModelConfig, onProgress?: ProgressCallback): Promise<ArrayBuffer> {
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
@@ -87,15 +103,19 @@ export class ModelLoader {
     const chunks: Uint8Array[] = [];
     let loaded = 0;
 
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      loaded += value.length;
-      if (onProgress && total) {
-        onProgress({ loaded, total, percent: (loaded / total) * 100 });
+    try {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        loaded += value.length;
+        if (onProgress && total) {
+          onProgress({ loaded, total, percent: (loaded / total) * 100 });
+        }
       }
+    } finally {
+      reader.cancel().catch(() => {});
     }
 
     const combined = new Uint8Array(loaded);
@@ -106,7 +126,6 @@ export class ModelLoader {
     }
 
     const buffer = combined.buffer.slice(combined.byteOffset, combined.byteOffset + combined.byteLength) as ArrayBuffer;
-    this.cache.set(config.id, buffer);
     return buffer;
   }
 
@@ -164,8 +183,6 @@ export class DynamicPrecisionController {
   }
 }
 
-export type NestedPrecision = 'int8_nested_int4' | 'int8_nested_int2';
-
 export class MatQuantEncoder {
   private readonly blockSize: number;
 
@@ -196,11 +213,11 @@ export class MatQuantEncoder {
       scales[b * 2 + 1] = scale;
       for (let i = start; i < end; i++) {
         const q = Math.round((data[i] - min) / scale);
-        const bi = Math.floor((i - start) / 2);
-        if ((i - start) % 2 === 0) {
-          packed[b * 64 + bi] = (packed[b * 64 + bi] & 0xF0) | (Math.min(15, Math.max(0, q)) & 0x0F);
+        const byteIdx = Math.floor(i / 2);
+        if (i % 2 === 0) {
+          packed[byteIdx] = (packed[byteIdx] & 0xF0) | (Math.min(15, Math.max(0, q)) & 0x0F);
         } else {
-          packed[b * 64 + bi] = (packed[b * 64 + bi] & 0x0F) | ((Math.min(15, Math.max(0, q)) << 4) & 0xF0);
+          packed[byteIdx] = (packed[byteIdx] & 0x0F) | ((Math.min(15, Math.max(0, q)) << 4) & 0xF0);
         }
       }
     }
@@ -220,8 +237,8 @@ export class MatQuantEncoder {
       let blockMin = Infinity, blockMax = -Infinity;
       const dequantized = new Float32Array(end - start);
       for (let i = start; i < end; i++) {
-        const byteIdx = b * 64 + Math.floor((i - start) / 2);
-        const nibble = ((i - start) % 2 === 0)
+        const byteIdx = Math.floor(i / 2);
+        const nibble = (i % 2 === 0)
           ? (encoded.packed[byteIdx] & 0x0F)
           : ((encoded.packed[byteIdx] >> 4) & 0x0F);
         const val = min + nibble * scale;

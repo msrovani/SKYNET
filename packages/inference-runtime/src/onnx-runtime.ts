@@ -31,7 +31,9 @@ export class OnnxRuntimeWeb {
     if (!outputName) throw new Error('Model has no outputs');
     const output = results[outputName];
     if (!output) throw new Error('Output not found');
-    return output.data instanceof Float32Array ? output.data : Float32Array.from(output.data as any);
+    if (output.data instanceof Float32Array) return output.data;
+    if (ArrayBuffer.isView(output.data)) return new Float32Array(output.data.buffer, output.data.byteOffset, output.data.byteLength / 4);
+    throw new Error('Unexpected output data type');
   }
 
   getSymbols(): { input: string; output: string; inputDims: number[][]; outputDims: number[][] } {

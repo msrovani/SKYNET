@@ -20,7 +20,7 @@ export interface SecureEnclaveConfig {
   fallbackToSimulation: boolean;
 }
 
-export interface SecureExecutionResult<T = Uint8Array> {
+export interface SecureExecutionResult<T extends Uint8Array = Uint8Array> {
   success: boolean;
   data: T;
   teeType: TeeType;
@@ -124,7 +124,7 @@ export class TeeBridge {
     };
   }
 
-  async executeSecure<T = Uint8Array>(
+  async executeSecure<T extends Uint8Array = Uint8Array>(
     data: Uint8Array,
     operation: (input: Uint8Array) => T | Promise<T>,
   ): Promise<SecureExecutionResult<T>> {

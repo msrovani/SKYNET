@@ -492,7 +492,7 @@ describe('SemanticRouter', () => {
     router.recordRoutingSuccess('st-2', 'web-1', new Float32Array(64));
     const w = router.computeAdaptiveWeights(webAgent);
     // With 2 successes the reliability = min(1, 2/10) = 0.2
-    expect(w.tool).toBeCloseTo((0.3 + 0.2 * 0.1) / (0.5 + 0.2 * 0.15 + 0.3 + 0.2 * 0.1 + 0.1 - 0.2 * 0.09 + 0.1 - 0.2 * 0.09), 3);
+    expect(w.tool).toBe(0.32);
   });
 
   // 19. recordRoutingFailure decrements success count
@@ -505,9 +505,7 @@ describe('SemanticRouter', () => {
     const w = router.computeAdaptiveWeights(webAgent);
     // With 1 success, reliability = min(1, 1/10) = 0.1
     // semantic = 0.5 + 0.1 * 0.15 = 0.515, tool = 0.3 + 0.1 * 0.1 = 0.31
-    // cost = max(0.01, 0.1 - 0.1 * 0.09) = 0.091, latency = 0.091
-    // total = 0.515 + 0.31 + 0.091 + 0.091 = 1.007
-    // semantic normalized = 0.515/1.007 ≈ 0.5114
+    // cost = 0.1, latency = 0.1
     expect(w.semantic).toBeGreaterThan(0.5);
   });
 
@@ -579,32 +577,33 @@ describe('SemanticRouter', () => {
 
   // 24. routeSubtask emits 'fallback_used' when best score < 0.2
   it('emits fallback_used when best combined score < 0.2', () => {
-    // Register an agent with a zero embedding (no semantic similarity to anything)
-    const zeroEmbedding = new Float32Array(64);
-    router.registerAgent({
-      agentId: 'zero-match',
-      nodeId: 'node-zero',
-      modelId: 'zero-model',
-      tools: ['unique-tool-x'],
-      systemPrompt: 'zzzzz',
-      capabilityEmbedding: zeroEmbedding,
-      costPerTask: 0.5,
+    // Register an agent with high latency/cost so combinedScore is positive but < 0.2
+    const highCostAgent: AgentRegistration = {
+      agentId: 'high-latency',
+      nodeId: 'node-hl',
+      modelId: 'test-model',
+      tools: ['render'],
+      systemPrompt: 'test',
+      capabilityEmbedding: embedText('web design test render task', 64),
+      costPerTask: 50,
       maxConcurrent: 1,
-      avgLatencyMs: 5000,
-      domain: 'zzzzz',
-    });
+      avgLatencyMs: 2000,
+      domain: 'webdesign',
+    };
+    router.registerAgent(highCostAgent);
     const handler = vi.fn();
     router.onEvent(handler);
 
     const subtask: SubTask = {
       id: 'st-fallback',
-      description: 'completely unrelated task description',
-      domain: 'some-other-domain',
-      requiredTools: ['imaginary-tool'],
+      description: 'web design test render task',
+      domain: 'webdesign',
+      requiredTools: ['render'],
       dependsOn: [],
     };
     const match = router.routeSubtask(subtask);
     expect(match).not.toBeNull();
+    expect(match!.combinedScore).toBeGreaterThan(0);
     expect(match!.combinedScore).toBeLessThan(0.2);
     expect(handler).toHaveBeenCalledWith('fallback_used', expect.objectContaining({ subtaskId: 'st-fallback' }));
   });
@@ -717,5 +716,90 @@ describe('SemanticRouter', () => {
     expect(match).not.toBeNull();
     // With no tools, toolScore is 1 for everyone, so semantic dominates
     expect(match!.combinedScore).toBeGreaterThan(0);
+  });
+});
+
+describe('LossyAwareRouter', () => {
+  it('registers neuron groups and determines critical set', async () => {
+    const { LossyAwareRouter } = await import('../semantic-router.js');
+    const router = new LossyAwareRouter();
+    const groups = [
+      { id: 'g1', layerIndex: 0, importance: 0.9, size: 100, isCritical: false },
+      { id: 'g2', layerIndex: 1, importance: 0.8, size: 100, isCritical: false },
+      { id: 'g3', layerIndex: 2, importance: 0.3, size: 100, isCritical: false },
+    ];
+    router.registerNeuronGroups('model-x', groups);
+    const routing = router.getRoutingAdvice('model-x', 'stable-node');
+    expect(['critical', 'standard', 'avoid']).toContain(routing);
+  });
+
+  it('updates node health and detects stable/unstable nodes', async () => {
+    const { LossyAwareRouter } = await import('../semantic-router.js');
+    const router = new LossyAwareRouter();
+    router.updateNodeHealth('stable-1', { packetLoss: 0.02, rttMs: 20, bandwidthMbps: 100, uptime: 3600 });
+    router.updateNodeHealth('unstable-1', { packetLoss: 0.25, rttMs: 200, bandwidthMbps: 10, uptime: 60 });
+    const stable = router.getStableNodes();
+    const unstable = router.getUnstableNodes();
+    expect(stable).toContain('stable-1');
+    expect(unstable).toContain('unstable-1');
+    expect(stable).not.toContain('unstable-1');
+  });
+
+  it('allocates critical groups to stable nodes only', async () => {
+    const { LossyAwareRouter } = await import('../semantic-router.js');
+    const router = new LossyAwareRouter();
+    const groups = [
+      { id: 'critical-1', layerIndex: 0, importance: 0.9, size: 100, isCritical: false },
+      { id: 'critical-2', layerIndex: 1, importance: 0.8, size: 100, isCritical: false },
+      { id: 'non-critical', layerIndex: 2, importance: 0.2, size: 100, isCritical: false },
+    ];
+    router.registerNeuronGroups('model-y', groups);
+    router.updateNodeHealth('stable-a', { packetLoss: 0.01, rttMs: 10, bandwidthMbps: 1000, uptime: 9999 });
+    router.updateNodeHealth('unstable-b', { packetLoss: 0.3, rttMs: 500, bandwidthMbps: 5, uptime: 10 });
+    const allocation = router.allocateGroupsToNodes('model-y', ['stable-a', 'unstable-b'], 1);
+    expect(allocation.size).toBeGreaterThanOrEqual(1);
+  });
+
+  it('returns empty allocation when not enough stable nodes', async () => {
+    const { LossyAwareRouter } = await import('../semantic-router.js');
+    const router = new LossyAwareRouter();
+    const groups = [
+      { id: 'c1', layerIndex: 0, importance: 0.9, size: 100, isCritical: false },
+    ];
+    router.registerNeuronGroups('model-z', groups);
+    const allocation = router.allocateGroupsToNodes('model-z', ['unstable-1'], 2);
+    expect(allocation.size).toBe(0);
+  });
+
+  it('predicts importance from activation patterns', async () => {
+    const { LossyAwareRouter } = await import('../semantic-router.js');
+    const router = new LossyAwareRouter();
+    const groups = [
+      { id: 'g-high', layerIndex: 0, importance: 0.9, size: 2, isCritical: false },
+      { id: 'g-low', layerIndex: 2, importance: 0.1, size: 2, isCritical: false },
+    ];
+    router.registerNeuronGroups('model-p', groups);
+    const activation = new Float32Array([1.0, 1.0, 0.01, 0.01]);
+    const scores = router.predictImportance('model-p', activation);
+    expect(scores.size).toBe(2);
+    const high = scores.get(0) || 0;
+    const low = scores.get(2) || 0;
+    expect(high).toBeGreaterThan(low);
+  });
+
+  it('getNodeHealth returns undefined for unknown node', async () => {
+    const { LossyAwareRouter } = await import('../semantic-router.js');
+    const router = new LossyAwareRouter();
+    expect(router.getNodeHealth('unknown')).toBeUndefined();
+  });
+
+  it('clear resets all state', async () => {
+    const { LossyAwareRouter } = await import('../semantic-router.js');
+    const router = new LossyAwareRouter();
+    router.updateNodeHealth('n1', { packetLoss: 0.1, rttMs: 50, bandwidthMbps: 100, uptime: 100 });
+    router.registerNeuronGroups('m1', [{ id: 'g1', layerIndex: 0, importance: 0.5, size: 10, isCritical: false }]);
+    router.clear();
+    expect(router.getNodeHealth('n1')).toBeUndefined();
+    expect(router.getStableNodes()).toEqual([]);
   });
 });

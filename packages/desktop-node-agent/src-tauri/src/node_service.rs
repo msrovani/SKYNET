@@ -1,7 +1,5 @@
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::Instant;
 
 static NODE_RUNNING: AtomicBool = AtomicBool::new(false);
 static TASKS_COMPLETED: AtomicU64 = AtomicU64::new(0);

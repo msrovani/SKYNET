@@ -402,6 +402,7 @@ export interface MPPSubscription {
 export class MPPStreaming {
   private subscriptions: Map<string, MPPSubscription> = new Map();
   private usageRecords: Array<{ planId: string; tokens: number; costUsd: number; timestamp: number }> = [];
+  private readonly MAX_USAGE_RECORDS = 10000;
 
   createSubscription(planId: string, tier: string, monthlyUsd: number, tokenAllowance: number): MPPSubscription {
     const sub: MPPSubscription = {
@@ -419,8 +420,12 @@ export class MPPStreaming {
   recordUsage(planId: string, tokens: number): { costUsd: number; remaining: number } | null {
     const sub = this.subscriptions.get(planId);
     if (!sub || sub.status !== 'active') return null;
+    if (sub.tokenAllowance <= 0) return null;
     const costUsd = (tokens / sub.tokenAllowance) * sub.monthlyUsd;
     this.usageRecords.push({ planId, tokens, costUsd, timestamp: Date.now() });
+    if (this.usageRecords.length > this.MAX_USAGE_RECORDS) {
+      this.usageRecords.shift();
+    }
     return { costUsd, remaining: sub.tokenAllowance - this.usageRecords.filter(r => r.planId === planId).reduce((s, r) => s + r.tokens, 0) };
   }
 
