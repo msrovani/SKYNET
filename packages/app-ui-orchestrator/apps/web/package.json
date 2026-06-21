@@ -9,10 +9,9 @@
   },
   "dependencies": {
     "@skynet/core-wasm-engine": "workspace:*",
-    "@skynet/p2p-mesh-network": "workspace:*",
-    "next": "^15.0.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "next": "15.5.19",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
   },
   "devDependencies": {
     "@types/node": "20.17.6",

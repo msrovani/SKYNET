@@ -23,13 +23,13 @@
     "lint": "eslint src/ --ext .ts"
   },
   "dependencies": {
-    "node-llama-cpp": "^3.18.1",
+    "node-llama-cpp": "3.18.1",
     "@skynet/p2p-mesh-network": "workspace:*",
     "@skynet/blockchain-client": "workspace:*"
   },
   "optionalDependencies": {
-    "onnxruntime-react-native": "^1.20.0",
-    "coremll": "^0.2.0"
+    "onnxruntime-react-native": "1.24.3",
+    "coremll": "0.2.0"
   },
   "devDependencies": {
     "eslint": "^8.57.0",

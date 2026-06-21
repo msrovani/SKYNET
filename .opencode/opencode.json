@@ -1,0 +1,51 @@
+{
+  "instructions": "AGENTS.md",
+  "skills": [
+    {
+      "name": "test",
+      "description": "Run tests in the monorepo",
+      "path": ".opencode/skills/test/SKILL.md"
+    },
+    {
+      "name": "lint",
+      "description": "Run ESLint across all packages",
+      "path": ".opencode/skills/lint/SKILL.md"
+    },
+    {
+      "name": "build",
+      "description": "Full monorepo build",
+      "path": ".opencode/skills/build/SKILL.md"
+    }
+  ],
+  "scopedRules": [
+    {
+      "pattern": "packages/core-wasm-engine/**/*.rs",
+      "rules": [
+        "Rust code compiles to wasm32-unknown-unknown target",
+        "Use #![allow(dead_code)] for wasm-bindgen exports not visible to Rust compiler"
+      ]
+    },
+    {
+      "pattern": "packages/desktop-node-agent/src-tauri/**/*.rs",
+      "rules": [
+        "Use #[allow(dead_code)] for public functions not yet called from Tauri commands",
+        "Build must use C:\\TauriBuild (ASCII path) due to MinGW linker limitation with accented paths"
+      ]
+    },
+    {
+      "pattern": "packages/app-ui-orchestrator/apps/web/**/*.{ts,tsx}",
+      "rules": [
+        "Never import @skynet/inference-runtime directly — frontend uses MockAgentModel inline",
+        "Next.js pages use proxy pattern: fetch /api/inference which delegates to inference-server.mjs",
+        "next.config.js must keep IgnorePlugin for @node-llama-cpp/* and @reflink/*"
+      ]
+    },
+    {
+      "pattern": "packages/**/*.test.ts",
+      "rules": [
+        "Use vi.stubGlobal() + vi.unstubAllGlobals() for mocking WebTransport/RTCPeerConnection",
+        "Prefer vi.mock() over vi.doMock() for module-level mocks"
+      ]
+    }
+  ]
+}

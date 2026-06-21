@@ -36,13 +36,13 @@ importers:
         specifier: workspace:*
         version: link:../core-wasm-engine
       next:
-        specifier: ^15.0.0
+        specifier: 15.5.19
         version: 15.5.19(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react:
-        specifier: ^19.0.0
+        specifier: 19.2.7
         version: 19.2.7
       react-dom:
-        specifier: ^19.0.0
+        specifier: 19.2.7
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@types/react':
@@ -64,10 +64,10 @@ importers:
   packages/blockchain-client:
     dependencies:
       '@solana/web3.js':
-        specifier: ^1.98.0
+        specifier: 1.98.4
         version: 1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6)
       tweetnacl:
-        specifier: ^1.0.3
+        specifier: 1.0.3
         version: 1.0.3
     devDependencies:
       eslint:
@@ -162,11 +162,11 @@ importers:
         specifier: workspace:*
         version: link:../p2p-mesh-network
       node-llama-cpp:
-        specifier: ^3.18.1
+        specifier: 3.18.1
         version: 3.18.1(typescript@5.9.3)
     optionalDependencies:
       onnxruntime-react-native:
-        specifier: ^1.20.0
+        specifier: 1.24.3
         version: 1.24.3(react-native@0.86.0(@babel/core@7.29.7)(@types/react@19.2.17)(bufferutil@4.1.0)(react@19.2.7)(utf-8-validate@6.0.6))(react@19.2.7)
     devDependencies:
       eslint:
@@ -182,7 +182,7 @@ importers:
   packages/p2p-mesh-network:
     dependencies:
       '@automerge/automerge':
-        specifier: ^3.0.0
+        specifier: 3.2.6
         version: 3.2.6
       '@skynet/core-wasm-engine':
         specifier: workspace:*
@@ -209,11 +209,8 @@ importers:
 
   packages/tee-attestation-layer:
     dependencies:
-      '@noble/hashes':
-        specifier: ^1.8.0
-        version: 1.8.0
       '@phala/dstack-sdk':
-        specifier: ^0.5.8
+        specifier: 0.5.8
         version: 0.5.8(@noble/curves@1.9.7)(@noble/hashes@1.8.0)(@solana/web3.js@1.98.4(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@6.0.6))
     devDependencies:
       eslint:

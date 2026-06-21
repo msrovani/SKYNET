@@ -27,7 +27,7 @@
     "dsd:mesh": "tsx scripts/run-dsd-mesh.ts"
   },
   "dependencies": {
-    "@automerge/automerge": "^3.0.0",
+    "@automerge/automerge": "3.2.6",
     "@skynet/core-wasm-engine": "workspace:*"
   },
   "devDependencies": {
